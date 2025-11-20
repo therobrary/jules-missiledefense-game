@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Missile Defense</title>
+    <style>
+        :root {
+            --bg-color: #0a0a0a;
+            --text-color: #ffffff;
+            --accent-color: #ffffff;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-family);
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none; /* Let clicks pass through to canvas when playing */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* HUD */
+        #hud {
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            font-weight: 300;
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            pointer-events: none;
+        }
+
+        .hud-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .hud-label {
+            font-size: 0.8rem;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+
+        /* Screens (Start, Game Over) */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 10, 10, 0.8);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            transition: opacity 0.5s ease;
+        }
+
+        .hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        h1 {
+            font-size: 4rem;
+            font-weight: 200;
+            letter-spacing: 10px;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.6);
+            text-align: center;
+        }
+
+        h2 {
+            font-size: 2rem;
+            font-weight: 300;
+            margin-bottom: 2rem;
+            text-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
+        }
+
+        p {
+            margin-bottom: 2rem;
+            font-weight: 300;
+            line-height: 1.5;
+            text-align: center;
+            max-width: 600px;
+            color: #cccccc;
+        }
+
+        /* Buttons */
+        button {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-color);
+            font-family: var(--font-family);
+            font-size: 1.2rem;
+            padding: 15px 40px;
+            border-radius: 50px; /* Pill shape */
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
+            transform: scale(1.05);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        /* Mobile adjustments */
+        @media (max-width: 768px) {
+            h1 { font-size: 2.5rem; }
+            h2 { font-size: 1.5rem; }
+            #hud { padding: 10px; font-size: 1rem; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div id="hud">
+            <div class="hud-item">
+                <span class="hud-label">Score</span>
+                <span id="scoreDisplay">0</span>
+            </div>
+            <div class="hud-item">
+                <span class="hud-label">High Score</span>
+                <span id="highScoreDisplay">0</span>
+            </div>
+            <div class="hud-item">
+                <span class="hud-label">Wave</span>
+                <span id="waveDisplay">1</span>
+            </div>
+            <div class="hud-item">
+                <span class="hud-label">Ammo</span>
+                <span id="ammoDisplay">30</span>
+            </div>
+        </div>
+
+        <div id="startScreen" class="screen">
+            <h1>Missile Defense</h1>
+            <p>Defend your cities from incoming ballistic missiles.<br>Tap or click to launch counter-measures.<br>Manage your ammo carefully.</p>
+            <button id="startBtn">Start Defense</button>
+        </div>
+
+        <div id="gameOverScreen" class="screen hidden">
+            <h1>Game Over</h1>
+            <h2 id="finalScore">Score: 0</h2>
+            <button id="restartBtn">Reboot System</button>
+        </div>
+
+        <div id="waveScreen" class="screen hidden">
+             <h2 id="waveTitle">Wave 1</h2>
+             <p id="waveBonus">Bonus: 0</p>
+        </div>
+    </div>
+
+    <script>
+        /* --- Game Constants & Config --- */
+        const CONFIG = {
+            bg: '#0a0a0a',
+            cityCount: 6,
+            baseAmmo: 30,
+            fps: 60,
+        };
+
+        /* --- State Management --- */
+        const STATE = {
+            START: 0,
+            PLAYING: 1,
+            WAVE_COMPLETE: 2,
+            GAME_OVER: 3
+        };
+
+        /* --- Game Classes --- */
+        class Entity {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.active = true;
+            }
+        }
+
+        class City extends Entity {
+            constructor(x, y) {
+                super(x, y);
+                this.width = 40;
+                this.height = 20;
+            }
+
+            draw(ctx) {
+                if (!this.active) return;
+                ctx.save();
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = 'rgba(200, 200, 200, 0.8)';
+                ctx.fillStyle = '#eeeeee';
+
+                // Draw a city shape (simple geometric)
+                ctx.beginPath();
+                ctx.moveTo(this.x - 20, this.y);
+                ctx.lineTo(this.x - 15, this.y - 10);
+                ctx.lineTo(this.x - 5, this.y - 10);
+                ctx.lineTo(this.x - 5, this.y - 15);
+                ctx.lineTo(this.x + 5, this.y - 15);
+                ctx.lineTo(this.x + 5, this.y - 8);
+                ctx.lineTo(this.x + 15, this.y - 8);
+                ctx.lineTo(this.x + 20, this.y);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        class Silo extends Entity {
+            constructor(x, y) {
+                super(x, y);
+            }
+
+            draw(ctx, ammo) {
+                ctx.save();
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#ffffff';
+                ctx.fillStyle = '#ffffff';
+
+                // Dome shape
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 30, Math.PI, 0);
+                ctx.fill();
+
+                // Ammo indicator
+                if (ammo > 0) {
+                    ctx.fillStyle = '#000000';
+                    ctx.font = '12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(ammo, this.x, this.y - 10);
+                }
+                ctx.restore();
+            }
+        }
+
+        class Missile extends Entity {
+            constructor(startX, startY, targetX, targetY, speed, isEnemy = false) {
+                super(startX, startY);
+                this.startX = startX;
+                this.startY = startY;
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.speed = speed;
+                this.isEnemy = isEnemy;
+
+                const angle = Math.atan2(targetY - startY, targetX - startX);
+                this.velocityX = Math.cos(angle) * speed;
+                this.velocityY = Math.sin(angle) * speed;
+
+                // Trail
+                this.trail = [];
+            }
+
+            update() {
+                this.trail.push({x: this.x, y: this.y, age: 0});
+
+                this.x += this.velocityX;
+                this.y += this.velocityY;
+
+                // Check if reached target (for player missiles) or went off screen/hit ground (for enemy)
+                if (!this.isEnemy) {
+                    // Distance check for player missiles to detonate at target
+                    const dist = Math.hypot(this.x - this.targetX, this.y - this.targetY);
+                    if (dist < this.speed) {
+                        this.active = false;
+                        return true; // Trigger explosion
+                    }
+                } else {
+                     // Enemy missiles stop when they hit something (handled in Game class)
+                     // or go below screen
+                     if (this.y > window.innerHeight) {
+                         this.active = false;
+                     }
+                }
+                return false;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.isEnemy ? '#aaaaaa' : '#ffffff';
+                ctx.strokeStyle = this.isEnemy ? '#cccccc' : '#ffffff';
+                ctx.lineWidth = 2;
+
+                // Draw Head
+                ctx.beginPath();
+                ctx.moveTo(this.x - this.velocityX * 2, this.y - this.velocityY * 2);
+                ctx.lineTo(this.x, this.y);
+                ctx.stroke();
+
+                // Draw Trail
+                ctx.beginPath();
+                for (let i = 0; i < this.trail.length; i++) {
+                    const point = this.trail[i];
+                    point.age++;
+                    if (point.age > 20) continue; // Fade out length
+
+                    ctx.globalAlpha = 1 - (point.age / 20);
+                    ctx.lineTo(point.x, point.y);
+                }
+                ctx.stroke();
+
+                ctx.restore();
+
+                // Clean trail
+                this.trail = this.trail.filter(p => p.age <= 20);
+            }
+        }
+
+        class Explosion extends Entity {
+            constructor(x, y) {
+                super(x, y);
+                this.radius = 1;
+                this.maxRadius = 40;
+                this.expansionRate = 1.5;
+                this.isRetracting = false;
+            }
+
+            update() {
+                if (!this.isRetracting) {
+                    this.radius += this.expansionRate;
+                    if (this.radius >= this.maxRadius) {
+                        this.isRetracting = true;
+                    }
+                } else {
+                    this.radius -= this.expansionRate;
+                    if (this.radius <= 0) {
+                        this.active = false;
+                    }
+                }
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.shadowBlur = 30;
+                ctx.shadowColor = '#ffffff';
+                ctx.fillStyle = '#ffffff';
+                ctx.globalAlpha = 0.8;
+
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, Math.max(0, this.radius), 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        class Particle extends Entity {
+            constructor(x, y, color) {
+                super(x, y);
+                this.vx = (Math.random() - 0.5) * 4;
+                this.vy = (Math.random() - 0.5) * 4;
+                this.life = 1.0;
+                this.decay = Math.random() * 0.03 + 0.01;
+                this.color = color || '#ffffff';
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= this.decay;
+                if (this.life <= 0) this.active = false;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 5;
+                ctx.shadowColor = this.color;
+                ctx.fillRect(this.x, this.y, 2, 2);
+                ctx.restore();
+            }
+        }
+
+        class Game {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.currentState = STATE.START;
+
+                // Game Entities
+                this.cities = [];
+                this.silo = null;
+                this.missiles = []; // Both friend and foe
+                this.explosions = [];
+                this.particles = [];
+
+                // Screen Shake
+                this.shakeStrength = 0;
+                this.shakeDecay = 0.9;
+
+                // Game Data
+                this.score = 0;
+                this.highScore = parseInt(localStorage.getItem('missileDefenseHighScore')) || 0;
+                this.wave = 1;
+                this.ammo = CONFIG.baseAmmo;
+
+                // UI Elements
+                this.ui = {
+                    startScreen: document.getElementById('startScreen'),
+                    gameOverScreen: document.getElementById('gameOverScreen'),
+                    waveScreen: document.getElementById('waveScreen'),
+                    score: document.getElementById('scoreDisplay'),
+                    highScore: document.getElementById('highScoreDisplay'),
+                    waveNum: document.getElementById('waveDisplay'),
+                    ammo: document.getElementById('ammoDisplay'),
+                    finalScore: document.getElementById('finalScore'),
+                    waveTitle: document.getElementById('waveTitle'),
+                    waveBonus: document.getElementById('waveBonus'),
+                    hud: document.getElementById('hud')
+                };
+
+                this.resizeCanvas();
+                window.addEventListener('resize', () => this.resizeCanvas());
+
+                // Event Listeners
+                document.getElementById('startBtn').addEventListener('click', () => this.startGame());
+                document.getElementById('restartBtn').addEventListener('click', () => this.startGame());
+
+                // Input Handling
+                this.canvas.addEventListener('mousedown', (e) => this.handleInput(e.clientX, e.clientY));
+                this.canvas.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    this.handleInput(touch.clientX, touch.clientY);
+                }, {passive: false});
+
+                // Render High Score immediately
+                this.updateUI();
+            }
+
+            handleInput(x, y) {
+                if (this.currentState !== STATE.PLAYING) return;
+                if (this.ammo <= 0) return;
+
+                this.ammo--;
+                this.updateUI();
+
+                // Create player missile from silo to click point
+                const startX = this.silo.x;
+                const startY = this.silo.y;
+                const speed = 15; // Fast player missiles
+
+                this.missiles.push(new Missile(startX, startY, x, y, speed, false));
+            }
+
+            resizeCanvas() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+            }
+
+            updateUI() {
+                this.ui.score.innerText = this.score;
+                this.ui.highScore.innerText = this.highScore;
+                this.ui.waveNum.innerText = this.wave;
+                this.ui.ammo.innerText = this.ammo;
+            }
+
+            initLevel() {
+                 const w = this.canvas.width;
+                 const h = this.canvas.height;
+                 const citySpacing = w / (CONFIG.cityCount + 3); // +3 to account for gaps and silo
+
+                 this.cities = [];
+                 // 3 cities left
+                 for(let i=1; i<=3; i++) {
+                     this.cities.push(new City(citySpacing * i, h - 20));
+                 }
+                 // 3 cities right
+                 for(let i=1; i<=3; i++) {
+                     this.cities.push(new City(w - (citySpacing * i), h - 20));
+                 }
+
+                 this.silo = new Silo(w / 2, h - 20);
+            }
+
+            startGame() {
+                this.score = 0;
+                this.wave = 1;
+                this.ammo = CONFIG.baseAmmo;
+                this.missiles = [];
+                this.explosions = [];
+                this.particles = [];
+                this.shakeStrength = 0;
+
+                this.initLevel();
+                this.updateUI();
+
+                this.setScreen(null); // Hide all overlays
+                this.startWave();
+
+                // Start Loop
+                if (!this.loopRunning) {
+                    this.loopRunning = true;
+                    this.loop();
+                }
+            }
+
+            startWave() {
+                this.currentState = STATE.PLAYING;
+                this.waveMissilesLeft = 10 + (this.wave * 2); // Increase missiles per wave
+                this.enemySpawnRate = Math.max(20, 100 - (this.wave * 5)); // Faster spawning
+                this.framesSinceLastSpawn = 0;
+                this.enemiesAlive = 0; // Track enemies on screen
+
+                // Show wave title briefly (optional logic, keeping simple for now)
+                this.ui.waveNum.innerText = this.wave;
+            }
+
+            spawnEnemy() {
+                const startX = Math.random() * this.canvas.width;
+                const startY = -20;
+
+                // Pick a random target (City or Silo)
+                const targets = [...this.cities.filter(c => c.active), this.silo];
+                if (targets.length === 0) return; // Game over logic handles this
+
+                const target = targets[Math.floor(Math.random() * targets.length)];
+                const speed = 1 + (this.wave * 0.1); // Slightly faster each wave
+
+                this.missiles.push(new Missile(startX, startY, target.x, target.y, speed, true));
+                this.waveMissilesLeft--;
+                this.enemiesAlive++;
+            }
+
+            spawnParticles(x, y, color) {
+                for(let i=0; i<10; i++) {
+                    this.particles.push(new Particle(x, y, color));
+                }
+            }
+
+            shake(amount) {
+                this.shakeStrength = amount;
+            }
+
+            checkCollisions() {
+                // 1. Explosions destroying Enemy Missiles
+                this.explosions.forEach(exp => {
+                    this.missiles.forEach(m => {
+                        if (m.isEnemy && m.active) {
+                            const dist = Math.hypot(m.x - exp.x, m.y - exp.y);
+                            if (dist < exp.radius) {
+                                m.active = false;
+                                this.score += 25;
+                                this.enemiesAlive--;
+                                // Spawn explosion at missile location too
+                                this.explosions.push(new Explosion(m.x, m.y));
+                                this.spawnParticles(m.x, m.y, '#aaaaaa');
+                            }
+                        }
+                    });
+                });
+
+                // 2. Enemy Missiles hitting Cities or Silo
+                this.missiles.forEach(m => {
+                    if (m.isEnemy && m.active) {
+                        // Simple distance check against targets
+                        // Check Cities
+                        this.cities.forEach(c => {
+                            if (c.active) {
+                                const dist = Math.hypot(m.x - c.x, m.y - c.y);
+                                if (dist < 20) { // Hit radius
+                                    m.active = false;
+                                    c.active = false;
+                                    this.enemiesAlive--;
+                                    this.explosions.push(new Explosion(m.x, m.y));
+                                    this.shake(15);
+                                    this.spawnParticles(m.x, m.y, '#ffffff');
+                                }
+                            }
+                        });
+
+                        // Check Silo
+                        const distSilo = Math.hypot(m.x - this.silo.x, m.y - this.silo.y);
+                        if (distSilo < 30) {
+                            m.active = false;
+                            this.ammo = 0; // Lost ammo
+                            this.enemiesAlive--;
+                            this.explosions.push(new Explosion(m.x, m.y));
+                            this.updateUI();
+                            this.shake(15);
+                            this.spawnParticles(m.x, m.y, '#ffffff');
+                        }
+                    }
+                });
+            }
+
+            checkWaveStatus() {
+                if (this.cities.filter(c => c.active).length === 0) {
+                    this.endGame();
+                    return;
+                }
+
+                if (this.waveMissilesLeft === 0 && this.enemiesAlive === 0 && this.explosions.length === 0) {
+                    // Wave Complete
+                    this.currentState = STATE.WAVE_COMPLETE;
+
+                    // Calculate Bonus
+                    const cityBonus = this.cities.filter(c => c.active).length * 100;
+                    const ammoBonus = this.ammo * 5;
+                    const totalBonus = cityBonus + ammoBonus;
+
+                    this.score += totalBonus;
+                    this.updateUI();
+
+                    // Show Wave Screen logic
+                    this.ui.waveTitle.innerText = `Wave ${this.wave} Complete`;
+                    this.ui.waveBonus.innerText = `City Bonus: ${cityBonus}\nAmmo Bonus: ${ammoBonus}`;
+                    this.setScreen(this.ui.waveScreen);
+
+                    // Auto-start next wave after delay
+                    setTimeout(() => {
+                        this.wave++;
+                        this.ammo += CONFIG.baseAmmo; // Refill ammo? Or add partial? Let's refill.
+                        // Cap ammo? Let's keep it simple for now.
+                        this.startWave();
+                        this.setScreen(null);
+                        this.updateUI();
+                    }, 3000);
+                }
+            }
+
+            endGame() {
+                this.currentState = STATE.GAME_OVER;
+
+                // Update High Score
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('missileDefenseHighScore', this.highScore);
+                }
+                this.ui.finalScore.innerText = `Score: ${this.score}`;
+                this.updateUI();
+                this.setScreen(this.ui.gameOverScreen);
+            }
+
+            setScreen(screenElement) {
+                // Hide all
+                this.ui.startScreen.classList.add('hidden');
+                this.ui.gameOverScreen.classList.add('hidden');
+                this.ui.waveScreen.classList.add('hidden');
+
+                // Show specific
+                if (screenElement) {
+                    screenElement.classList.remove('hidden');
+                }
+            }
+
+            loop() {
+                // Shake Effect
+                let shakeX = 0;
+                let shakeY = 0;
+                if (this.shakeStrength > 0) {
+                    shakeX = (Math.random() - 0.5) * this.shakeStrength;
+                    shakeY = (Math.random() - 0.5) * this.shakeStrength;
+                    this.shakeStrength *= this.shakeDecay;
+                    if(this.shakeStrength < 0.5) this.shakeStrength = 0;
+                }
+
+                this.ctx.save();
+                this.ctx.translate(shakeX, shakeY);
+
+                // Clear Canvas
+                this.ctx.fillStyle = CONFIG.bg;
+                this.ctx.fillRect(-shakeX, -shakeY, this.canvas.width, this.canvas.height);
+
+                if (this.currentState === STATE.PLAYING) {
+                   // Spawn Logic
+                   this.framesSinceLastSpawn++;
+                   if (this.waveMissilesLeft > 0 && this.framesSinceLastSpawn > this.enemySpawnRate) {
+                       this.spawnEnemy();
+                       this.framesSinceLastSpawn = 0;
+                   }
+
+                   // Update Entities
+                   this.missiles.forEach(m => {
+                       if(m.update()) {
+                           // Player missile reached target
+                           this.explosions.push(new Explosion(m.x, m.y));
+                       }
+                   });
+                   this.explosions.forEach(e => e.update());
+                   this.particles.forEach(p => p.update());
+
+                   // Collision Detection
+                   this.checkCollisions();
+                   this.updateUI(); // To show score updates live
+
+                   // Cleanup
+                   this.missiles = this.missiles.filter(m => m.active);
+                   this.explosions = this.explosions.filter(e => e.active);
+                   this.particles = this.particles.filter(p => p.active);
+
+                   // Logic Check
+                   this.checkWaveStatus();
+
+                   // Draw Entities
+                   this.cities.forEach(c => c.draw(this.ctx));
+                   this.silo.draw(this.ctx, this.ammo);
+                   this.missiles.forEach(m => m.draw(this.ctx));
+                   this.explosions.forEach(e => e.draw(this.ctx));
+                   this.particles.forEach(p => p.draw(this.ctx));
+                }
+
+                this.ctx.restore();
+                requestAnimationFrame(() => this.loop());
+            }
+        }
+
+        // Initialize Game
+        window.addEventListener('load', () => {
+            const game = new Game();
+        });
+
+    </script>
+</body>
+</html>
