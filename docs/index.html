@@ -477,7 +477,7 @@
                 if (this.isEnemy && this.active && this.type === 'splitter' && this.y >= this.splitAltitude) {
                     this.active = false;
                     game.triggerSplit(this.x, this.y);
-                    return false;
+                    return;
                 }
 
                 // Check if reached target (for player missiles) or went off screen/hit ground (for enemy)
