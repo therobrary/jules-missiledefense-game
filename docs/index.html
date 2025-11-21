@@ -459,7 +459,9 @@
                 this.velocityY = Math.sin(angle) * speed;
 
                 // Split Altitude for splitter
-                this.splitAltitude = 100 + Math.random() * 150;
+                if (type === 'splitter') {
+                    this.splitAltitude = 100 + Math.random() * 150;
+                }
 
                 // Trail
                 this.trail = [];
