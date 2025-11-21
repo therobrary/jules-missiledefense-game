@@ -496,7 +496,7 @@
             }
 
             handleInput(x, y) {
-                if (this.currentState !== STATE.PLAYING) return;
+                if (this.currentState !== STATE.PLAYING || this.paused) return;
                 if (this.ammo <= 0) return;
 
                 this.ammo--;
