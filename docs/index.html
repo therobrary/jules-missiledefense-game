@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Missile Defense</title>
+    <title>Robrary Games: Missle Defense</title>
     <style>
         :root {
             --bg-color: #0a0a0a;
@@ -190,7 +190,7 @@
         </div>
 
         <div id="startScreen" class="screen">
-            <h1>Missile Defense</h1>
+            <h1>Robrary Games:<br>Missle Defense</h1>
             <p>Defend your cities from incoming ballistic missiles.<br>Tap or click to launch counter-measures.<br>Manage your ammo carefully.<br><br>ESC to End Game | Space to Pause</p>
             <button id="startBtn">Start Defense</button>
         </div>
@@ -225,6 +225,95 @@
         };
 
         /* --- Game Classes --- */
+        class SoundManager {
+            constructor() {
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                this.enabled = true;
+            }
+
+            play(type) {
+                if (!this.enabled) return;
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+
+                const now = this.ctx.currentTime;
+                const gain = this.ctx.createGain();
+                gain.connect(this.ctx.destination);
+
+                if (type === 'explosion') {
+                    // Noise buffer for explosion
+                    const bufferSize = this.ctx.sampleRate * 0.5; // 0.5 seconds
+                    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        data[i] = Math.random() * 2 - 1;
+                    }
+                    const noise = this.ctx.createBufferSource();
+                    noise.buffer = buffer;
+
+                    // Filter for "thud" sound
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(1000, now);
+                    filter.frequency.exponentialRampToValueAtTime(100, now + 0.4);
+
+                    noise.connect(filter);
+                    filter.connect(gain);
+
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                    noise.start(now);
+                    noise.stop(now + 0.5);
+                } else {
+                    const osc = this.ctx.createOscillator();
+                    osc.connect(gain);
+
+                    if (type === 'shoot') {
+                        osc.type = 'square';
+                        osc.frequency.setValueAtTime(880, now);
+                        osc.frequency.exponentialRampToValueAtTime(110, now + 0.1);
+                        gain.gain.setValueAtTime(0.1, now);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                        osc.start(now);
+                        osc.stop(now + 0.1);
+                    } else if (type === 'hit') {
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(150, now);
+                        osc.frequency.exponentialRampToValueAtTime(0.01, now + 0.2);
+                        gain.gain.setValueAtTime(0.2, now);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                        osc.start(now);
+                        osc.stop(now + 0.2);
+                    } else if (type === 'start') {
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(440, now);
+                        osc.frequency.setValueAtTime(880, now + 0.1);
+                        gain.gain.setValueAtTime(0.1, now);
+                        gain.gain.linearRampToValueAtTime(0, now + 0.5);
+                        osc.start(now);
+                        osc.stop(now + 0.5);
+                    } else if (type === 'gameover') {
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(440, now);
+                        osc.frequency.linearRampToValueAtTime(220, now + 1.0);
+                        gain.gain.setValueAtTime(0.2, now);
+                        gain.gain.linearRampToValueAtTime(0, now + 2.0);
+                        osc.start(now);
+                        osc.stop(now + 2.0);
+                    } else if (type === 'empty') {
+                        osc.type = 'square';
+                        osc.frequency.setValueAtTime(150, now);
+                        osc.frequency.linearRampToValueAtTime(100, now + 0.1);
+                        gain.gain.setValueAtTime(0.1, now);
+                        gain.gain.linearRampToValueAtTime(0, now + 0.1);
+                        osc.start(now);
+                        osc.stop(now + 0.1);
+                    }
+                }
+            }
+        }
+
         class Entity {
             constructor(x, y) {
                 this.x = x;
@@ -265,13 +354,21 @@
         class Silo extends Entity {
             constructor(x, y) {
                 super(x, y);
+                this.maxHealth = 3;
+                this.health = this.maxHealth;
             }
 
             draw(ctx, ammo) {
+                if (this.health <= 0) return; // Destroyed
+
                 ctx.save();
                 ctx.shadowBlur = 20;
                 ctx.shadowColor = '#ffffff';
-                ctx.fillStyle = '#ffffff';
+
+                // Color based on health
+                if (this.health === 3) ctx.fillStyle = '#ffffff';
+                else if (this.health === 2) ctx.fillStyle = '#aaaaaa';
+                else ctx.fillStyle = '#ff5555';
 
                 // Dome shape
                 ctx.beginPath();
@@ -285,12 +382,69 @@
                     ctx.textAlign = 'center';
                     ctx.fillText(ammo, this.x, this.y - 10);
                 }
+
+                // Health Indicator (simple dots below)
+                ctx.fillStyle = '#00ff00';
+                for(let i=0; i<this.health; i++) {
+                    ctx.fillRect(this.x - 15 + (i*12), this.y + 5, 8, 4);
+                }
+
+                ctx.restore();
+            }
+        }
+
+        class Bomber extends Entity {
+            constructor(y, speed) {
+                const startLeft = Math.random() > 0.5;
+                super(startLeft ? -30 : window.innerWidth + 30, y);
+                this.vx = startLeft ? speed : -speed;
+                this.width = 40;
+                this.height = 15;
+                this.lastDropTime = 0;
+                this.dropInterval = 60 + Math.random() * 60;
+            }
+
+            update(game) {
+                this.x += this.vx;
+
+                // Drop Logic
+                this.lastDropTime++;
+                if (this.lastDropTime > this.dropInterval) {
+                     game.spawnEnemyMissile(this.x, this.y);
+                     this.lastDropTime -= this.dropInterval;
+                     this.dropInterval = 60 + Math.random() * 120; // Reset interval
+                }
+
+                // Off screen check
+                if ((this.vx > 0 && this.x > game.canvas.width + 50) ||
+                    (this.vx < 0 && this.x < -50)) {
+                    this.active = false;
+                }
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#ff0000';
+                ctx.fillStyle = '#ff0000';
+
+                // UFO Shape
+                ctx.beginPath();
+                ctx.ellipse(this.x, this.y, 20, 8, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Dome
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y - 5, 8, Math.PI, 0);
+                ctx.fill();
+
                 ctx.restore();
             }
         }
 
         class Missile extends Entity {
-            constructor(startX, startY, targetX, targetY, speed, isEnemy = false) {
+            constructor(startX, startY, targetX, targetY, speed, isEnemy = false, type = 'normal') {
                 super(startX, startY);
                 this.startX = startX;
                 this.startY = startY;
@@ -298,20 +452,33 @@
                 this.targetY = targetY;
                 this.speed = speed;
                 this.isEnemy = isEnemy;
+                this.type = type;
 
                 const angle = Math.atan2(targetY - startY, targetX - startX);
                 this.velocityX = Math.cos(angle) * speed;
                 this.velocityY = Math.sin(angle) * speed;
 
+                // Split Altitude for splitter
+                if (type === 'splitter') {
+                    this.splitAltitude = 100 + Math.random() * 150;
+                }
+
                 // Trail
                 this.trail = [];
             }
 
-            update() {
+            update(game) {
                 this.trail.push({x: this.x, y: this.y, age: 0});
 
                 this.x += this.velocityX;
                 this.y += this.velocityY;
+
+                // Split Logic
+                if (this.isEnemy && this.active && this.type === 'splitter' && this.y >= this.splitAltitude) {
+                    this.active = false;
+                    game.triggerSplit(this.x, this.y);
+                    return;
+                }
 
                 // Check if reached target (for player missiles) or went off screen/hit ground (for enemy)
                 if (!this.isEnemy) {
@@ -329,8 +496,16 @@
             draw(ctx) {
                 ctx.save();
                 ctx.shadowBlur = 10;
-                ctx.shadowColor = this.isEnemy ? '#aaaaaa' : '#ffffff';
-                ctx.strokeStyle = this.isEnemy ? '#cccccc' : '#ffffff';
+
+                // Color based on type
+                if (this.type === 'splitter') {
+                    ctx.shadowColor = '#ff00ff';
+                    ctx.strokeStyle = '#ff00ff';
+                } else {
+                    ctx.shadowColor = this.isEnemy ? '#aaaaaa' : '#ffffff';
+                    ctx.strokeStyle = this.isEnemy ? '#cccccc' : '#ffffff';
+                }
+
                 ctx.lineWidth = 2;
 
                 // Draw Head
@@ -391,6 +566,15 @@
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, Math.max(0, this.radius), 0, Math.PI * 2);
                 ctx.fill();
+
+                // Shockwave Ring
+                ctx.globalAlpha = 0.5;
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, Math.max(0, this.radius * 0.7), 0, Math.PI * 2);
+                ctx.stroke();
+
                 ctx.restore();
             }
         }
@@ -427,12 +611,14 @@
             constructor() {
                 this.canvas = document.getElementById('gameCanvas');
                 this.ctx = this.canvas.getContext('2d');
+                this.audio = new SoundManager();
                 this.currentState = STATE.START;
 
                 // Game Entities
                 this.cities = [];
                 this.silo = null;
                 this.missiles = []; // Both friend and foe
+                this.bombers = [];
                 this.explosions = [];
                 this.particles = [];
 
@@ -497,9 +683,14 @@
 
             handleInput(x, y) {
                 if (this.currentState !== STATE.PLAYING || this.paused) return;
-                if (this.ammo <= 0) return;
+                if (this.silo.health <= 0) return;
+                if (this.ammo <= 0) {
+                    this.audio.play('empty');
+                    return;
+                }
 
                 this.ammo--;
+                this.audio.play('shoot');
                 this.updateUI();
 
                 // Create player missile from silo to click point
@@ -541,10 +732,13 @@
             }
 
             startGame() {
+                this.audio.play('start');
                 this.score = 0;
                 this.wave = 1;
                 this.ammo = CONFIG.baseAmmo;
+                this.silo.health = this.silo.maxHealth;
                 this.missiles = [];
+                this.bombers = [];
                 this.explosions = [];
                 this.particles = [];
                 this.shakeStrength = 0;
@@ -575,6 +769,12 @@
             }
 
             spawnEnemy() {
+                // Decide type based on wave
+                let type = 'normal';
+                if (this.wave >= 3 && Math.random() < 0.3) {
+                    type = 'splitter';
+                }
+
                 const startX = Math.random() * this.canvas.width;
                 const startY = -20;
 
@@ -585,9 +785,32 @@
                 const target = targets[Math.floor(Math.random() * targets.length)];
                 const speed = 1 + (this.wave * 0.1); // Slightly faster each wave
 
-                this.missiles.push(new Missile(startX, startY, target.x, target.y, speed, true));
+                this.missiles.push(new Missile(startX, startY, target.x, target.y, speed, true, type));
                 this.waveMissilesLeft--;
                 this.enemiesAlive++;
+            }
+
+            spawnEnemyMissile(x, y) {
+                 const targets = [...this.cities.filter(c => c.active), this.silo];
+                 if (targets.length === 0) return;
+
+                 const target = targets[Math.floor(Math.random() * targets.length)];
+                 const speed = 2 + (this.wave * 0.1);
+                 this.missiles.push(new Missile(x, y, target.x, target.y, speed, true));
+                 this.enemiesAlive++;
+            }
+
+            triggerSplit(x, y) {
+                this.spawnParticles(x, y, '#ff00ff');
+                // Spawn 3 small missiles
+                for(let i=0; i<3; i++) {
+                    this.spawnEnemyMissile(x, y);
+                }
+            }
+
+            spawnBomber() {
+                const speed = 2 + (this.wave * 0.1);
+                this.bombers.push(new Bomber(50 + Math.random() * 50, speed));
             }
 
             spawnParticles(x, y, color) {
@@ -601,7 +824,7 @@
             }
 
             checkCollisions() {
-                // 1. Explosions destroying Enemy Missiles
+                // 1. Explosions destroying Enemy Missiles & Bombers
                 this.explosions.forEach(exp => {
                     this.missiles.forEach(m => {
                         if (m.isEnemy && m.active) {
@@ -613,6 +836,20 @@
                                 // Spawn explosion at missile location too
                                 this.explosions.push(new Explosion(m.x, m.y));
                                 this.spawnParticles(m.x, m.y, '#aaaaaa');
+                                this.audio.play('explosion');
+                            }
+                        }
+                    });
+
+                    this.bombers.forEach(b => {
+                        if (b.active) {
+                            const dist = Math.hypot(b.x - exp.x, b.y - exp.y);
+                             if (dist < exp.radius + 20) {
+                                b.active = false;
+                                this.score += 100; // Bonus for bomber
+                                this.explosions.push(new Explosion(b.x, b.y));
+                                this.spawnParticles(b.x, b.y, '#ff0000');
+                                this.audio.play('explosion');
                             }
                         }
                     });
@@ -633,20 +870,32 @@
                                     this.explosions.push(new Explosion(m.x, m.y));
                                     this.shake(15);
                                     this.spawnParticles(m.x, m.y, '#ffffff');
+                                    this.audio.play('hit');
                                 }
                             }
                         });
 
                         // Check Silo
                         const distSilo = Math.hypot(m.x - this.silo.x, m.y - this.silo.y);
-                        if (distSilo < 30) {
+                        if (distSilo < 30 && this.silo.health > 0) {
                             m.active = false;
-                            this.ammo = 0; // Lost ammo
                             this.enemiesAlive--;
                             this.explosions.push(new Explosion(m.x, m.y));
-                            this.updateUI();
+
+                            this.silo.health--;
                             this.shake(15);
                             this.spawnParticles(m.x, m.y, '#ffffff');
+
+                            if (this.silo.health <= 0) {
+                                this.ammo = 0; // Lost ammo
+                                this.audio.play('explosion'); // Big boom
+                                // Big particles
+                                this.spawnParticles(this.silo.x, this.silo.y, '#ff0000');
+                                this.spawnParticles(this.silo.x, this.silo.y, '#ffffff');
+                            } else {
+                                this.audio.play('hit');
+                            }
+                            this.updateUI();
                         }
                     }
                 });
@@ -658,7 +907,7 @@
                     return;
                 }
 
-                if (this.waveMissilesLeft === 0 && this.enemiesAlive === 0 && this.explosions.length === 0) {
+                if (this.waveMissilesLeft === 0 && this.enemiesAlive === 0 && this.bombers.length === 0 && this.explosions.length === 0) {
                     // Wave Complete
                     this.currentState = STATE.WAVE_COMPLETE;
 
@@ -689,6 +938,7 @@
 
             endGame() {
                 this.currentState = STATE.GAME_OVER;
+                this.audio.play('gameover');
 
                 // Update High Score
                 if (this.score > this.highScore) {
@@ -739,17 +989,24 @@
                            this.framesSinceLastSpawn = 0;
                        }
 
+                       // Random Bomber Spawn (Wave 5+)
+                       if (this.wave >= 5 && Math.random() < 0.001) {
+                           this.spawnBomber();
+                       }
+
                        // Update Entities
                        this.missiles.forEach(m => {
-                           if(m.update()) {
+                           if(m.update(this)) {
                                // Player missile reached target
                                this.explosions.push(new Explosion(m.x, m.y));
+                               this.audio.play('explosion');
                            } else if (m.isEnemy && m.active && m.y > this.canvas.height) {
                                // Enemy missile went off screen (missed everything)
                                m.active = false;
                                this.enemiesAlive--;
                            }
                        });
+                       this.bombers.forEach(b => b.update(this));
                        this.explosions.forEach(e => e.update());
                        this.particles.forEach(p => p.update());
 
@@ -759,6 +1016,7 @@
 
                        // Cleanup
                        this.missiles = this.missiles.filter(m => m.active);
+                       this.bombers = this.bombers.filter(b => b.active);
                        this.explosions = this.explosions.filter(e => e.active);
                        this.particles = this.particles.filter(p => p.active);
 
@@ -770,6 +1028,7 @@
                    this.cities.forEach(c => c.draw(this.ctx));
                    this.silo.draw(this.ctx, this.ammo);
                    this.missiles.forEach(m => m.draw(this.ctx));
+                   this.bombers.forEach(b => b.draw(this.ctx));
                    this.explosions.forEach(e => e.draw(this.ctx));
                    this.particles.forEach(p => p.draw(this.ctx));
 
