@@ -9,7 +9,7 @@ This guide outlines how to deploy the `Missile Defense` game to GitHub Pages. Si
 ## Steps
 
 1.  **Push Code to GitHub**
-    *   Ensure `index.html` is in the root directory of your repository.
+    *   Ensure `index.html` is in the `docs/` folder of your repository.
     *   Commit and push your changes to the `main` (or `master`) branch.
 
 2.  **Enable GitHub Pages**
@@ -19,7 +19,7 @@ This guide outlines how to deploy the `Missile Defense` game to GitHub Pages. Si
 
 3.  **Configure Build Source**
     *   Under **Source**, select **Deploy from a branch**.
-    *   Under **Branch**, select `main` (or your default branch) and `/ (root)`.
+    *   Under **Branch**, select `main` (or your default branch) and `/docs`.
     *   Click **Save**.
 
 4.  **Verify Deployment**
