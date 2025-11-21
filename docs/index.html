@@ -411,7 +411,7 @@
                 this.lastDropTime++;
                 if (this.lastDropTime > this.dropInterval) {
                      game.spawnEnemyMissile(this.x, this.y);
-                     this.lastDropTime = 0;
+                     this.lastDropTime -= this.dropInterval;
                      this.dropInterval = 60 + Math.random() * 120; // Reset interval
                 }
 
