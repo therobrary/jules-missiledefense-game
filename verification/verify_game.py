@@ -1,58 +1,42 @@
-from playwright.sync_api import sync_playwright, expect
-import time
 
-def verify_game_changes():
+from playwright.sync_api import sync_playwright
+
+def verify_game_load():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 
-        # 1. Load the game
-        page.goto("http://localhost:8080")
-        print("Page loaded")
+        # Navigate to the game
+        page.goto("http://localhost:8080/docs/index.html")
 
-        # 2. Verify Start Screen Instructions
-        start_screen = page.locator("#startScreen")
-        expect(start_screen).to_be_visible()
-        instructions = start_screen.locator("p")
-        expect(instructions).to_contain_text("ESC to End Game")
-        expect(instructions).to_contain_text("Space to Pause")
-        print("Instructions verified")
+        # Wait for canvas to exist
+        page.wait_for_selector("canvas")
 
-        # Take screenshot of start screen
+        # Wait for Start Screen
+        page.wait_for_selector("#startScreen")
+
+        # Take screenshot of Start Screen
         page.screenshot(path="verification/start_screen.png")
+        print("Start screen screenshot taken.")
 
-        # 3. Start Game
+        # Click Start
         page.click("#startBtn")
-        time.sleep(1) # Wait for game to start and some updates
-        print("Game started")
 
-        # 4. Test Pause
-        page.keyboard.press("Space")
-        time.sleep(0.5)
-        page.screenshot(path="verification/paused_state.png")
-        print("Paused state captured")
+        # Wait a bit for game to start and things to draw
+        page.wait_for_timeout(2000)
 
-        # Verify PAUSED text is likely visible (canvas pixel check is hard, but we can trust the screenshot)
-        # Unpause
-        page.keyboard.press("Space")
-        time.sleep(0.5)
-        print("Unpaused")
+        # Trigger a shot to test sound (though we can't hear it in screenshot) and ammo update
+        # Click near the top
+        page.mouse.click(400, 100)
 
-        # 5. Test End Game (ESC)
-        page.keyboard.press("Escape")
-        time.sleep(0.5)
+        # Wait for missile to fly a bit
+        page.wait_for_timeout(500)
 
-        game_over_screen = page.locator("#gameOverScreen")
-        expect(game_over_screen).to_be_visible()
-        print("Game Over screen verified")
-        page.screenshot(path="verification/game_over.png")
+        # Take screenshot of Gameplay
+        page.screenshot(path="verification/gameplay.png")
+        print("Gameplay screenshot taken.")
 
         browser.close()
 
 if __name__ == "__main__":
-    try:
-        verify_game_changes()
-        print("Verification script finished successfully.")
-    except Exception as e:
-        print(f"Verification failed: {e}")
-        exit(1)
+    verify_game_load()
