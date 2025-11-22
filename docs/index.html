@@ -75,6 +75,22 @@
             align-items: center;
         }
 
+        .hud-item.interactive {
+            cursor: pointer;
+            transition: transform 0.2s ease, text-shadow 0.2s ease;
+            pointer-events: auto;
+        }
+
+        .hud-item.interactive:hover {
+            transform: scale(1.1);
+            text-shadow: 0 0 15px #00ffff;
+            color: #ffffff;
+        }
+
+        .hud-item.interactive:active {
+            transform: scale(0.95);
+        }
+
         .hud-label {
             font-size: 0.8rem;
             opacity: 0.7;
@@ -186,6 +202,10 @@
             <div class="hud-item">
                 <span class="hud-label">Ammo</span>
                 <span id="ammoDisplay">30</span>
+            </div>
+            <div class="hud-item interactive" id="weaponToggle">
+                <span class="hud-label">Weapon (SHIFT)</span>
+                <span id="weaponDisplay">NORMAL</span>
             </div>
         </div>
 
@@ -501,6 +521,9 @@
                 if (this.type === 'splitter') {
                     ctx.shadowColor = '#ff00ff';
                     ctx.strokeStyle = '#ff00ff';
+                } else if (this.type === 'flak' && !this.isEnemy) {
+                    ctx.shadowColor = '#00ffff';
+                    ctx.strokeStyle = '#00ffff';
                 } else {
                     ctx.shadowColor = this.isEnemy ? '#aaaaaa' : '#ffffff';
                     ctx.strokeStyle = this.isEnemy ? '#cccccc' : '#ffffff';
@@ -613,6 +636,7 @@
                 this.ctx = this.canvas.getContext('2d');
                 this.audio = new SoundManager();
                 this.currentState = STATE.START;
+                this.currentWeapon = 'normal';
 
                 // Game Entities
                 this.cities = [];
@@ -645,7 +669,8 @@
                     finalScore: document.getElementById('finalScore'),
                     waveTitle: document.getElementById('waveTitle'),
                     waveBonus: document.getElementById('waveBonus'),
-                    hud: document.getElementById('hud')
+                    hud: document.getElementById('hud'),
+                    weaponDisplay: document.getElementById('weaponDisplay')
                 };
 
                 this.resizeCanvas();
@@ -655,6 +680,7 @@
                 // Event Listeners
                 document.getElementById('startBtn').addEventListener('click', () => this.startGame());
                 document.getElementById('restartBtn').addEventListener('click', () => this.startGame());
+                document.getElementById('weaponToggle').addEventListener('click', () => this.toggleWeapon());
 
                 // Input Handling
                 this.canvas.addEventListener('mousedown', (e) => this.handleInput(e.clientX, e.clientY));
@@ -679,17 +705,39 @@
                         this.paused = !this.paused;
                     }
                 }
+                if (e.key === "Shift") {
+                     if (this.currentState === STATE.PLAYING) {
+                         this.toggleWeapon();
+                     }
+                }
+            }
+
+            toggleWeapon() {
+                if (this.currentWeapon === 'normal') {
+                    this.currentWeapon = 'flak';
+                    this.ui.weaponDisplay.innerText = "FLAK (3)";
+                    this.ui.weaponDisplay.style.color = '#ff00ff';
+                } else {
+                    this.currentWeapon = 'normal';
+                    this.ui.weaponDisplay.innerText = "NORMAL";
+                    this.ui.weaponDisplay.style.color = '#ffffff';
+                }
+                this.audio.play('start'); // Use start sound as a UI blip
             }
 
             handleInput(x, y) {
                 if (this.currentState !== STATE.PLAYING || this.paused) return;
                 if (this.silo.health <= 0) return;
-                if (this.ammo <= 0) {
+
+                let cost = 1;
+                if (this.currentWeapon === 'flak') cost = 3;
+
+                if (this.ammo < cost) {
                     this.audio.play('empty');
                     return;
                 }
 
-                this.ammo--;
+                this.ammo -= cost;
                 this.audio.play('shoot');
                 this.updateUI();
 
@@ -698,7 +746,7 @@
                 const startY = this.silo.y;
                 const speed = 15; // Fast player missiles
 
-                this.missiles.push(new Missile(startX, startY, x, y, speed, false));
+                this.missiles.push(new Missile(startX, startY, x, y, speed, false, this.currentWeapon));
             }
 
             resizeCanvas() {
@@ -804,6 +852,23 @@
                 // Spawn 3 small missiles
                 for(let i=0; i<3; i++) {
                     this.spawnEnemyMissile(x, y);
+                }
+            }
+
+            createFlak(x, y) {
+                // Center explosion
+                this.explosions.push(new Explosion(x, y));
+                this.spawnParticles(x, y, '#00ffff');
+
+                // Cluster explosions
+                for(let i=0; i<5; i++) {
+                    setTimeout(() => {
+                        const offsetX = (Math.random() - 0.5) * 100;
+                        const offsetY = (Math.random() - 0.5) * 100;
+                        this.explosions.push(new Explosion(x + offsetX, y + offsetY));
+                        this.spawnParticles(x + offsetX, y + offsetY, '#00ffff');
+                        this.audio.play('explosion');
+                    }, i * 50);
                 }
             }
 
@@ -997,8 +1062,13 @@
                        this.missiles.forEach(m => {
                            if(m.update(this)) {
                                // Player missile reached target
-                               this.explosions.push(new Explosion(m.x, m.y));
-                               this.audio.play('explosion');
+                               if (m.type === 'flak') {
+                                   this.createFlak(m.x, m.y);
+                                   this.audio.play('explosion'); // First bang
+                               } else {
+                                   this.explosions.push(new Explosion(m.x, m.y));
+                                   this.audio.play('explosion');
+                               }
                            } else if (m.isEnemy && m.active && m.y > this.canvas.height) {
                                // Enemy missile went off screen (missed everything)
                                m.active = false;
