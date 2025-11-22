@@ -1066,7 +1066,7 @@
                        this.missiles.forEach(m => {
                            if(m.update(this)) {
                                // Player missile reached target
-                               if (m.type === 'flak') {
+                               if (m.type === 'flak' && !m.isEnemy) {
                                    this.createFlak(m.x, m.y);
                                    this.audio.play('explosion'); // First bang
                                } else {
