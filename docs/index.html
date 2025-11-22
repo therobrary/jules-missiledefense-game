@@ -680,7 +680,11 @@
                 // Event Listeners
                 document.getElementById('startBtn').addEventListener('click', () => this.startGame());
                 document.getElementById('restartBtn').addEventListener('click', () => this.startGame());
-                document.getElementById('weaponToggle').addEventListener('click', () => this.toggleWeapon());
+                document.getElementById('weaponToggle').addEventListener('click', () => {
+                    if (this.currentState === STATE.PLAYING && !this.paused) {
+                        this.toggleWeapon();
+                    }
+                });
 
                 // Input Handling
                 this.canvas.addEventListener('mousedown', (e) => this.handleInput(e.clientX, e.clientY));
