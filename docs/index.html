@@ -1135,7 +1135,7 @@
                 localStorage.setItem('missileDefenseLeaderboard', JSON.stringify(this.leaderboard));
 
                 // Update UI State
-                this.highScore = this.leaderboard[0].score;
+                this.highScore = this.leaderboard.length > 0 ? this.leaderboard[0].score : 0;
                 this.updateUI();
 
                 // Hide Input, Show List and Button
