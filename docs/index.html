@@ -740,7 +740,14 @@
 
                 // Game Data
                 this.score = 0;
-                this.leaderboard = JSON.parse(localStorage.getItem('missileDefenseLeaderboard')) || [];
+                let leaderboard = [];
+                try {
+                    leaderboard = JSON.parse(localStorage.getItem('missileDefenseLeaderboard')) || [];
+                } catch (e) {
+                    console.warn('Failed to load leaderboard, resetting:', e);
+                    leaderboard = [];
+                }
+                this.leaderboard = leaderboard;
                 // Use the highest score from leaderboard or 0
                 this.highScore = this.leaderboard.length > 0 ? this.leaderboard[0].score : 0;
                 this.wave = 1;
