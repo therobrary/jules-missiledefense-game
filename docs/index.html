@@ -584,6 +584,7 @@
                 // Split Logic
                 if (this.isEnemy && this.active && this.type === 'splitter' && this.y >= this.splitAltitude) {
                     this.active = false;
+                    game.enemiesAlive--; // Account for the splitter itself being destroyed
                     game.triggerSplit(this.x, this.y);
                     return;
                 }
