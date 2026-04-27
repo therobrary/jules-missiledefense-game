@@ -1,5 +1,5 @@
 # Missile Defense
-A modern, sleek, grayscale arcade game inspired by the classic Missile Command. Built with HTML5 Canvas and JavaScript in a single file.
+A Neon Noir, grayscale-first arcade game inspired by the classic Missile Command. Built with HTML5 Canvas and JavaScript in a single file.
 
 ## How to Play
 1.  **Objective**: Defend your 6 cities from incoming ballistic missiles.
@@ -16,9 +16,9 @@ A modern, sleek, grayscale arcade game inspired by the classic Missile Command. 
         *   Wave Bonus: 100 pts per surviving City + 5 pts per leftover Ammo.
 
 ## Visual Style
-*   **Modern Sleek Grayscale**: High-contrast black and white aesthetic.
-*   **Neon Glow**: All game entities emit a glow using Canvas shadow effects.
-*   **Glassmorphism**: UI elements feature semi-transparent, blurred backgrounds.
+*   **Neon Noir**: Grayscale-first palette with a restrained cyan accent.
+*   **Courier New Monospace**: Terminal-style overlays, HUD, and labels.
+*   **Glassmorphism**: Semi-transparent panels with blur, border, and soft glow.
 *   **Effects**: Particle explosions, screen shake, and missile trails.
 
 ## Tech Stack

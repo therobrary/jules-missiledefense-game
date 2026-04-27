@@ -3,15 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Robrary Games: Missle Defense</title>
+    <title>Robrary Games: Missile Defense</title>
     <style>
+        /* ============================================================
+           NEON NOIR DESIGN TOKENS
+           Grayscale-dominant palette with restrained cyan accent
+           ============================================================ */
         :root {
-            --bg-color: #0a0a0a;
-            --text-color: #ffffff;
-            --accent-color: #ffffff;
-            --glass-bg: rgba(255, 255, 255, 0.05);
-            --glass-border: rgba(255, 255, 255, 0.1);
-            --font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
+            --bg-deep: #050505;
+            --bg-field: #0a0a0a;
+            --bg-skyline: #111111;
+            --text-primary: #e0e0e0;
+            --text-dim: #888888;
+            --text-danger: #cc4444;
+            --accent: #00e5ff;
+            --accent-glow: rgba(0, 229, 255, 0.35);
+            --accent-pulse: rgba(0, 229, 255, 0.12);
+            --glass-bg: rgba(255, 255, 255, 0.04);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-highlight: rgba(255, 255, 255, 0.12);
+            --glass-blur: 12px;
+            --border-radius: 4px;
+            --glow-soft: 0 0 15px rgba(255, 255, 255, 0.15);
+            --glow-accent: 0 0 15px var(--accent-glow);
+            --motion-fast: 0.15s;
+            --motion-normal: 0.3s;
+            --motion-slow: 0.6s;
+            --font-mono: 'Courier New', Courier, monospace;
         }
 
         * {
@@ -23,15 +41,38 @@
         }
 
         body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: var(--font-family);
+            background-color: var(--bg-deep);
+            color: var(--text-primary);
+            font-family: var(--font-mono);
             overflow: hidden;
             width: 100vw;
             height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
+        }
+
+        /* Atmospheric background layers */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                linear-gradient(180deg, var(--bg-deep) 0%, var(--bg-field) 60%, var(--bg-skyline) 100%);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+            background-size: 40px 40px;
+            z-index: 0;
+            pointer-events: none;
         }
 
         canvas {
@@ -56,145 +97,267 @@
             justify-content: space-between;
         }
 
-        /* HUD */
+        /* HUD — compact terminal readout */
         #hud {
-            padding: 20px;
+            padding: 12px 20px;
             display: flex;
             justify-content: space-between;
-            font-weight: 300;
-            font-size: 1.2rem;
-            text-transform: uppercase;
+            align-items: flex-start;
+            font-family: var(--font-mono);
+            font-weight: 400;
+            font-size: 0.75rem;
             letter-spacing: 2px;
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
             pointer-events: none;
+            color: var(--text-dim);
+        }
+
+        .hud-col {
+            display: flex;
+            gap: 24px;
         }
 
         .hud-item {
             display: flex;
             flex-direction: column;
             align-items: center;
+            gap: 2px;
+        }
+
+        .hud-label {
+            font-size: 0.6rem;
+            opacity: 0.6;
+            letter-spacing: 3px;
+        }
+
+        .hud-value {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-shadow: 0 0 8px rgba(255,255,255,0.2);
         }
 
         .hud-item.interactive {
             cursor: pointer;
-            transition: transform 0.2s ease, text-shadow 0.2s ease;
+            transition: transform var(--motion-fast) ease, text-shadow var(--motion-fast) ease;
             pointer-events: auto;
         }
 
         .hud-item.interactive:hover {
-            transform: scale(1.1);
-            text-shadow: 0 0 15px #00ffff;
-            color: #ffffff;
+            transform: translateY(-2px);
+            text-shadow: 0 0 12px var(--accent-glow);
         }
 
         .hud-item.interactive:active {
             transform: scale(0.95);
         }
 
-        .hud-label {
-            font-size: 0.8rem;
-            opacity: 0.7;
-            margin-bottom: 5px;
+        .hud-item.interactive.flak-active .hud-value {
+            color: var(--accent);
+            text-shadow: 0 0 12px var(--accent-glow);
         }
 
-        /* Screens (Start, Game Over) */
+        /* Overlay — unified card system */
         .screen {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(10, 10, 10, 0.8);
-            backdrop-filter: blur(10px);
+            inset: 0;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             pointer-events: auto;
-            transition: opacity 0.5s ease;
+            transition: opacity var(--motion-slow) ease;
+            background: rgba(5, 5, 5, 0.85);
+            backdrop-filter: blur(var(--glass-blur));
+            -webkit-backdrop-filter: blur(var(--glass-blur));
         }
 
-        .hidden {
+        .screen.hidden {
             opacity: 0;
             pointer-events: none;
         }
 
-        h1 {
-            font-size: 4rem;
-            font-weight: 200;
-            letter-spacing: 10px;
+        .overlay-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--border-radius);
+            padding: 40px 50px;
+            max-width: 480px;
+            width: 90%;
+            text-align: center;
+            box-shadow: var(--glow-soft), inset 0 1px 0 var(--glass-highlight);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        .overlay-card h1 {
+            font-size: 2.2rem;
+            font-weight: 300;
+            letter-spacing: 6px;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 0 20px rgba(255,255,255,0.3);
+            line-height: 1.3;
+        }
+
+        .overlay-card h2 {
+            font-size: 1.4rem;
+            font-weight: 300;
+            letter-spacing: 4px;
             text-transform: uppercase;
             margin-bottom: 1rem;
-            text-shadow: 0 0 20px rgba(255, 255, 255, 0.6);
-            text-align: center;
+            text-shadow: 0 0 12px rgba(255,255,255,0.2);
         }
 
-        h2 {
-            font-size: 2rem;
-            font-weight: 300;
-            margin-bottom: 2rem;
-            text-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
+        .overlay-card .subtitle {
+            font-size: 0.7rem;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            margin-bottom: 1.5rem;
         }
 
-        p {
-            margin-bottom: 2rem;
-            font-weight: 300;
-            line-height: 1.5;
+        .overlay-card p {
+            margin-bottom: 1.5rem;
+            font-size: 0.8rem;
+            line-height: 1.6;
+            color: var(--text-dim);
             text-align: center;
-            max-width: 600px;
-            color: #cccccc;
         }
 
         /* Buttons */
         button {
             background: var(--glass-bg);
             border: 1px solid var(--glass-border);
-            color: var(--text-color);
-            font-family: var(--font-family);
-            font-size: 1.2rem;
-            padding: 15px 40px;
-            border-radius: 50px; /* Pill shape */
-            cursor: pointer;
-            transition: all 0.3s ease;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            font-weight: 400;
+            letter-spacing: 4px;
             text-transform: uppercase;
-            letter-spacing: 2px;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(5px);
+            padding: 14px 36px;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: all var(--motion-normal) ease;
+            box-shadow: 0 0 10px rgba(0,0,0,0.4);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
         }
 
         button:hover {
-            background: rgba(255, 255, 255, 0.2);
-            box-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
-            transform: scale(1.05);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--glass-highlight);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5), var(--glow-soft);
+            transform: translateY(-2px);
         }
 
         button:active {
-            transform: scale(0.95);
+            transform: translateY(0);
         }
 
-        /* Mobile adjustments */
+        button.primary {
+            border-color: var(--accent);
+            color: var(--accent);
+            box-shadow: 0 0 10px rgba(0,0,0,0.4), var(--glow-accent);
+        }
+
+        button.primary:hover {
+            background: var(--accent-pulse);
+            box-shadow: 0 4px 25px rgba(0,0,0,0.5), var(--glow-accent);
+        }
+
+        /* Wave Announcement — brief flash */
+        #waveAnnouncement {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 20;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        #waveAnnouncement.visible {
+            opacity: 1;
+        }
+
+        #waveAnnouncement .wave-text {
+            font-size: 3rem;
+            font-weight: 300;
+            letter-spacing: 10px;
+            text-transform: uppercase;
+            color: var(--text-primary);
+            text-shadow: 0 0 30px rgba(255,255,255,0.4);
+            white-space: nowrap;
+        }
+
+        /* Responsive */
         @media (max-width: 768px) {
-            h1 { font-size: 2.5rem; }
-            h2 { font-size: 1.5rem; }
-            #hud { padding: 10px; font-size: 1rem; }
+            .overlay-card {
+                padding: 30px 24px;
+            }
+            .overlay-card h1 {
+                font-size: 1.5rem;
+                letter-spacing: 4px;
+            }
+            .overlay-card h2 {
+                font-size: 1.1rem;
+            }
+            #hud {
+                padding: 8px 12px;
+                font-size: 0.6rem;
+            }
+            .hud-col {
+                gap: 14px;
+            }
+            .hud-label {
+                font-size: 0.5rem;
+            }
+            .hud-value {
+                font-size: 0.85rem;
+            }
+            .overlay-card p {
+                font-size: 0.7rem;
+            }
+            button {
+                font-size: 0.75rem;
+                padding: 12px 28px;
+            }
+            #waveAnnouncement .wave-text {
+                font-size: 2rem;
+            }
         }
 
-        /* High Score Styles */
+        @media (max-width: 480px) {
+            .hud-col {
+                gap: 10px;
+            }
+            .overlay-card {
+                padding: 24px 16px;
+                width: 95%;
+            }
+            .overlay-card h1 {
+                font-size: 1.2rem;
+            }
+        }
+
         #leaderboardContainer {
             width: 100%;
-            max-width: 500px;
-            margin-bottom: 30px;
-            padding: 0 20px;
+            margin-bottom: 24px;
+            padding: 0;
         }
 
         #leaderboardContainer h3 {
             text-align: center;
-            font-weight: 300;
+            font-size: 0.7rem;
+            font-weight: 400;
+            letter-spacing: 5px;
             text-transform: uppercase;
-            letter-spacing: 4px;
-            margin-bottom: 15px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            padding-bottom: 5px;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--glass-border);
         }
 
         #highScoreList {
@@ -204,53 +367,61 @@
         .highscore-item {
             display: flex;
             justify-content: space-between;
-            padding: 8px 10px;
-            font-size: 1.2rem;
+            padding: 6px 4px;
+            font-size: 0.8rem;
             letter-spacing: 2px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            color: var(--text-dim);
         }
 
         .highscore-item:nth-child(1) {
-            color: #00ffff;
-            text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+            color: var(--accent);
+            text-shadow: 0 0 8px var(--accent-glow);
         }
 
         #highScoreInputContainer {
             display: flex;
             flex-direction: column;
             align-items: center;
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.03);
             padding: 20px;
-            border-radius: 15px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            margin-bottom: 30px;
-            backdrop-filter: blur(5px);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--glass-border);
+            margin-bottom: 24px;
+            backdrop-filter: blur(6px);
+        }
+
+        #highScoreInputContainer .new-record-label {
+            margin-bottom: 1rem;
+            color: var(--accent);
+            font-size: 0.65rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
         }
 
         #playerNameInput {
-            background: rgba(0, 0, 0, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: #ffffff;
-            font-family: var(--font-family);
-            font-size: 2.5rem;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 1.5rem;
             text-align: center;
             text-transform: uppercase;
-            padding: 10px;
-            width: 180px;
-            border-radius: 5px;
-            margin-bottom: 20px;
+            padding: 8px;
+            width: 140px;
+            border-radius: var(--border-radius);
+            margin-bottom: 12px;
             outline: none;
-            letter-spacing: 10px;
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+            letter-spacing: 8px;
         }
 
         #playerNameInput:focus {
-            border-color: #00ffff;
-            box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+            border-color: var(--accent);
+            box-shadow: 0 0 10px var(--accent-glow);
         }
 
         #playerNameInput::placeholder {
-            color: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.15);
         }
 
     </style>
@@ -260,71 +431,143 @@
     <canvas id="gameCanvas"></canvas>
 
     <div id="ui-layer">
+        <!-- HUD -->
         <div id="hud">
-            <div class="hud-item">
-                <span class="hud-label">Score</span>
-                <span id="scoreDisplay">0</span>
+            <div class="hud-col">
+                <div class="hud-item">
+                    <span class="hud-label">SCORE</span>
+                    <span class="hud-value" id="scoreDisplay">0</span>
+                </div>
+                <div class="hud-item">
+                    <span class="hud-label">HI-SCORE</span>
+                    <span class="hud-value" id="highScoreDisplay">0</span>
+                </div>
             </div>
-            <div class="hud-item">
-                <span class="hud-label">High Score</span>
-                <span id="highScoreDisplay">0</span>
-            </div>
-            <div class="hud-item">
-                <span class="hud-label">Wave</span>
-                <span id="waveDisplay">1</span>
-            </div>
-            <div class="hud-item">
-                <span class="hud-label">Ammo</span>
-                <span id="ammoDisplay">30</span>
-            </div>
-            <div class="hud-item interactive" id="weaponToggle">
-                <span class="hud-label">Weapon (SHIFT)</span>
-                <span id="weaponDisplay">NORMAL</span>
+            <div class="hud-col">
+                <div class="hud-item">
+                    <span class="hud-label">WAVE</span>
+                    <span class="hud-value" id="waveDisplay">1</span>
+                </div>
+                <div class="hud-item">
+                    <span class="hud-label">LIVES</span>
+                    <span class="hud-value" id="livesDisplay">6</span>
+                </div>
+                <div class="hud-item">
+                    <span class="hud-label">AMMO</span>
+                    <span class="hud-value" id="ammoDisplay">30</span>
+                </div>
+                <div class="hud-item interactive" id="weaponToggle" title="Toggle weapon (SHIFT)">
+                    <span class="hud-label">WEAPON</span>
+                    <span class="hud-value" id="weaponDisplay">NORMAL</span>
+                </div>
             </div>
         </div>
 
+        <!-- Wave Announcement Flash -->
+        <div id="waveAnnouncement">
+            <span class="wave-text" id="waveAnnouncementText">WAVE 1</span>
+        </div>
+
+        <!-- Start Screen -->
         <div id="startScreen" class="screen">
-            <h1>Robrary Games:<br>Missle Defense</h1>
-            <p>Defend your cities from incoming ballistic missiles.<br>Tap or click to launch counter-measures.<br>Manage your ammo carefully.<br><br>ESC to End Game | Space to Pause</p>
-            <button id="startBtn">Start Defense</button>
+            <div class="overlay-card">
+                <h1>Missile Defense</h1>
+                <p class="subtitle">Robrary Games</p>
+                <p>Defend your cities from incoming ballistic missiles.<br>
+                   Click or tap to launch counter-measures.<br>
+                   Manage your ammo carefully.</p>
+                <p style="font-size:0.65rem; letter-spacing:2px; color:var(--text-dim);">
+                    SHIFT — toggle weapon &nbsp;|&nbsp; SPACE — pause &nbsp;|&nbsp; ESC — end game
+                </p>
+                <button id="startBtn" class="primary">INITIATE</button>
+            </div>
         </div>
 
+        <!-- Game Over Screen -->
         <div id="gameOverScreen" class="screen hidden">
-            <h1>Game Over</h1>
-            <h2 id="finalScore">Score: 0</h2>
+            <div class="overlay-card">
+                <h1>MISSION FAILED</h1>
+                <h2 id="finalScore">SCORE: 0</h2>
 
-            <div id="highScoreInputContainer" class="hidden">
-                <p style="margin-bottom: 1rem; color: #00ffff; letter-spacing: 2px;">NEW HIGH SCORE RECORD</p>
-                <input type="text" id="playerNameInput" maxlength="3" placeholder="___" autocomplete="off">
-                <button id="submitScoreBtn">ENTER</button>
+                <div id="highScoreInputContainer" class="hidden">
+                    <p class="new-record-label">NEW HIGH SCORE RECORD</p>
+                    <input type="text" id="playerNameInput" maxlength="3" placeholder="___" autocomplete="off">
+                    <button id="submitScoreBtn">ENTER</button>
+                </div>
+
+                <div id="leaderboardContainer">
+                    <h3>LEADERBOARD</h3>
+                    <ul id="highScoreList">
+                        <!-- Populated by JS -->
+                    </ul>
+                </div>
+
+                <button id="restartBtn" class="primary">REBOOT</button>
             </div>
-
-            <div id="leaderboardContainer">
-                <h3>High Scores</h3>
-                <ul id="highScoreList">
-                    <!-- Populated by JS -->
-                </ul>
-            </div>
-
-            <button id="restartBtn">Reboot System</button>
         </div>
 
+        <!-- Wave Complete Screen -->
         <div id="waveScreen" class="screen hidden">
-             <h2 id="waveTitle">Wave 1</h2>
-             <p id="waveBonus">Bonus: 0</p>
+            <div class="overlay-card">
+                <h2 id="waveTitle">WAVE 1 COMPLETE</h2>
+                <p id="waveBonus">BONUS: 0</p>
+                <button id="nextWaveBtn" class="primary">DEPLOY</button>
+            </div>
+        </div>
+
+        <!-- Pause Overlay -->
+        <div id="pauseScreen" class="screen hidden">
+            <div class="overlay-card">
+                <h1>PAUSED</h1>
+                <p>Press SPACE to resume</p>
+            </div>
         </div>
     </div>
 
     <script>
-        /* --- Game Constants & Config --- */
+        /* ============================================================
+           GAME CONSTANTS & CONFIG
+           ============================================================ */
         const CONFIG = {
-            bg: '#0a0a0a',
+            bg: '#050505',
             cityCount: 6,
             baseAmmo: 30,
             fps: 60,
+            // Wave tuning
+            waveMissileBase: 10,
+            waveMissilePerWave: 3,
+            waveSpawnRateBase: 80,
+            waveSpawnRateMin: 15,
+            waveMissileSpeedBase: 1,
+            waveMissileSpeedPerWave: 0.15,
+            bomberWaveThreshold: 5,
+            bomberSpawnChance: 0.001,
+            splitterWaveThreshold: 3,
+            splitterChance: 0.3,
+            // Scoring
+            normalKillScore: 25,
+            flakKillScore: 15,
+            bomberKillScore: 100,
+            splitterKillScore: 50,
+            // Ammo refill per wave (fraction of base)
+            ammoRefillFraction: 0.75,
+            // City/ammo bonus
+            cityBonusPerCity: 100,
+            ammoBonusPerAmmo: 5,
+            // Explosion
+            explosionMaxRadius: 40,
+            explosionExpansionRate: 1.5,
+            // Particles
+            particleCount: 10,
+            // Shake
+            cityHitShake: 15,
+            siloHitShake: 15,
+            maxShake: 20,
         };
 
-        /* --- State Management --- */
+        /* ============================================================
+           STATE MANAGEMENT
+           ============================================================ */
         const STATE = {
             START: 0,
             PLAYING: 1,
@@ -332,7 +575,9 @@
             GAME_OVER: 3
         };
 
-        /* --- Game Classes --- */
+        /* ============================================================
+           GAME CLASSES
+           ============================================================ */
         class SoundManager {
             constructor() {
                 this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -486,13 +731,15 @@
                 // Ammo indicator
                 if (ammo > 0) {
                     ctx.fillStyle = '#000000';
-                    ctx.font = '12px Arial';
+                    ctx.font = '12px Courier New';
                     ctx.textAlign = 'center';
                     ctx.fillText(ammo, this.x, this.y - 10);
                 }
 
                 // Health Indicator (simple dots below)
-                ctx.fillStyle = '#00ff00';
+                if (this.health === 3) ctx.fillStyle = '#e0e0e0';
+                else if (this.health === 2) ctx.fillStyle = '#aaaaaa';
+                else ctx.fillStyle = '#cc4444';
                 for(let i=0; i<this.health; i++) {
                     ctx.fillRect(this.x - 15 + (i*12), this.y + 5, 8, 4);
                 }
@@ -532,9 +779,9 @@
 
             draw(ctx) {
                 ctx.save();
-                ctx.shadowBlur = 15;
-                ctx.shadowColor = '#ff0000';
-                ctx.fillStyle = '#ff0000';
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = '#cc4444';
+                ctx.fillStyle = '#cc4444';
 
                 // UFO Shape
                 ctx.beginPath();
@@ -649,8 +896,8 @@
             constructor(x, y) {
                 super(x, y);
                 this.radius = 1;
-                this.maxRadius = 40;
-                this.expansionRate = 1.5;
+                this.maxRadius = CONFIG.explosionMaxRadius;
+                this.expansionRate = CONFIG.explosionExpansionRate;
                 this.isRetracting = false;
             }
 
@@ -752,23 +999,29 @@
                 // Use the highest score from leaderboard or 0
                 this.highScore = this.leaderboard.length > 0 ? this.leaderboard[0].score : 0;
                 this.wave = 1;
+                this.waveStartTime = performance.now();
                 this.ammo = CONFIG.baseAmmo;
                 this.paused = false;
 
-                // UI Elements
+               // UI Elements
                 this.ui = {
                     startScreen: document.getElementById('startScreen'),
                     gameOverScreen: document.getElementById('gameOverScreen'),
                     waveScreen: document.getElementById('waveScreen'),
+                    pauseScreen: document.getElementById('pauseScreen'),
+                    waveAnnouncement: document.getElementById('waveAnnouncement'),
+                    waveAnnouncementText: document.getElementById('waveAnnouncementText'),
                     score: document.getElementById('scoreDisplay'),
                     highScore: document.getElementById('highScoreDisplay'),
                     waveNum: document.getElementById('waveDisplay'),
+                    lives: document.getElementById('livesDisplay'),
                     ammo: document.getElementById('ammoDisplay'),
                     finalScore: document.getElementById('finalScore'),
                     waveTitle: document.getElementById('waveTitle'),
                     waveBonus: document.getElementById('waveBonus'),
                     hud: document.getElementById('hud'),
                     weaponDisplay: document.getElementById('weaponDisplay'),
+                    weaponToggle: document.getElementById('weaponToggle'),
 
                     // High Score UI
                     inputContainer: document.getElementById('highScoreInputContainer'),
@@ -776,7 +1029,8 @@
                     highScoreList: document.getElementById('highScoreList'),
                     nameInput: document.getElementById('playerNameInput'),
                     submitBtn: document.getElementById('submitScoreBtn'),
-                    restartBtn: document.getElementById('restartBtn')
+                    restartBtn: document.getElementById('restartBtn'),
+                    nextWaveBtn: document.getElementById('nextWaveBtn')
                 };
 
                 this.resizeCanvas();
@@ -802,6 +1056,15 @@
                     }
                 });
 
+                // Next wave button
+                this.ui.nextWaveBtn.addEventListener('click', () => {
+                    this.wave++;
+                    this.ammo = Math.floor(CONFIG.baseAmmo * CONFIG.ammoRefillFraction);
+                    this.startWave();
+                    this.setScreen(null);
+                    this.updateUI();
+                });
+
                 // Input Handling
                 this.canvas.addEventListener('mousedown', (e) => this.handleInput(e.clientX, e.clientY));
                 this.canvas.addEventListener('touchstart', (e) => {
@@ -814,7 +1077,7 @@
                 this.updateUI();
             }
 
-            handleKey(e) {
+           handleKey(e) {
                 if (e.code === "Escape") {
                      if (this.currentState === STATE.PLAYING || this.currentState === STATE.WAVE_COMPLETE) {
                          this.endGame();
@@ -823,6 +1086,11 @@
                 if (e.code === "Space") {
                     if (this.currentState === STATE.PLAYING) {
                         this.paused = !this.paused;
+                        if (this.paused) {
+                            this.ui.pauseScreen.classList.remove('hidden');
+                        } else {
+                            this.ui.pauseScreen.classList.add('hidden');
+                        }
                     }
                 }
                 if (e.key === "Shift") {
@@ -832,17 +1100,17 @@
                 }
             }
 
-            toggleWeapon() {
+           toggleWeapon() {
                 if (this.currentWeapon === 'normal') {
                     this.currentWeapon = 'flak';
                     this.ui.weaponDisplay.innerText = "FLAK (3)";
-                    this.ui.weaponDisplay.style.color = '#00ffff';
+                    this.ui.weaponToggle.classList.add('flak-active');
                 } else {
                     this.currentWeapon = 'normal';
                     this.ui.weaponDisplay.innerText = "NORMAL";
-                    this.ui.weaponDisplay.style.color = '#ffffff';
+                    this.ui.weaponToggle.classList.remove('flak-active');
                 }
-                this.audio.play('start'); // Use start sound as a UI blip
+                this.audio.play('start');
             }
 
             handleInput(x, y) {
@@ -874,10 +1142,11 @@
                 this.canvas.height = window.innerHeight;
             }
 
-            updateUI() {
+          updateUI() {
                 this.ui.score.innerText = this.score;
                 this.ui.highScore.innerText = this.highScore;
                 this.ui.waveNum.innerText = this.wave;
+                this.ui.lives.innerText = this.cities.filter(c => c.active).length;
                 this.ui.ammo.innerText = this.ammo;
             }
 
@@ -910,12 +1179,16 @@
                 this.particles = [];
                 this.shakeStrength = 0;
                 this.paused = false;
+                this.currentWeapon = 'normal';
+                this.ui.weaponToggle.classList.remove('flak-active');
+                this.ui.weaponDisplay.innerText = "NORMAL";
 
                 this.initLevel();
                 this.updateUI();
 
-                this.setScreen(null); // Hide all overlays
+                this.setScreen(null);
                 this.startWave();
+                this.showWaveAnnouncement();
 
                 // Start Loop
                 if (!this.loopRunning) {
@@ -924,33 +1197,30 @@
                 }
             }
 
-            startWave() {
+           startWave() {
                 this.currentState = STATE.PLAYING;
-                this.waveMissilesLeft = 10 + (this.wave * 2); // Increase missiles per wave
-                this.enemySpawnRate = Math.max(20, 100 - (this.wave * 5)); // Faster spawning
+                this.waveMissilesLeft = CONFIG.waveMissileBase + (this.wave * CONFIG.waveMissilePerWave);
+                this.enemySpawnRate = Math.max(CONFIG.waveSpawnRateMin, CONFIG.waveSpawnRateBase - (this.wave * 5));
                 this.framesSinceLastSpawn = 0;
-                this.enemiesAlive = 0; // Track enemies on screen
+                this.enemiesAlive = 0;
 
-                // Show wave title briefly (optional logic, keeping simple for now)
                 this.ui.waveNum.innerText = this.wave;
             }
 
-            spawnEnemy() {
-                // Decide type based on wave
+           spawnEnemy() {
                 let type = 'normal';
-                if (this.wave >= 3 && Math.random() < 0.3) {
+                if (this.wave >= CONFIG.splitterWaveThreshold && Math.random() < CONFIG.splitterChance) {
                     type = 'splitter';
                 }
 
                 const startX = Math.random() * this.canvas.width;
                 const startY = -20;
 
-                // Pick a random target (City or Silo)
                 const targets = [...this.cities.filter(c => c.active), this.silo];
-                if (targets.length === 0) return; // Game over logic handles this
+                if (targets.length === 0) return;
 
                 const target = targets[Math.floor(Math.random() * targets.length)];
-                const speed = 1 + (this.wave * 0.1); // Slightly faster each wave
+                const speed = CONFIG.waveMissileSpeedBase + (this.wave * CONFIG.waveMissileSpeedPerWave);
 
                 this.missiles.push(new Missile(startX, startY, target.x, target.y, speed, true, type));
                 this.waveMissilesLeft--;
@@ -993,12 +1263,12 @@
             }
 
             spawnBomber() {
-                const speed = 2 + (this.wave * 0.1);
+                const speed = CONFIG.waveMissileSpeedBase + (this.wave * CONFIG.waveMissileSpeedPerWave);
                 this.bombers.push(new Bomber(50 + Math.random() * 50, speed));
             }
 
             spawnParticles(x, y, color) {
-                for(let i=0; i<10; i++) {
+                for(let i=0; i<CONFIG.particleCount; i++) {
                     this.particles.push(new Particle(x, y, color));
                 }
             }
@@ -1015,9 +1285,11 @@
                             const dist = Math.hypot(m.x - exp.x, m.y - exp.y);
                             if (dist < exp.radius) {
                                 m.active = false;
-                                this.score += 25;
+                                let points = CONFIG.normalKillScore;
+                                if (m.type === 'splitter') points = CONFIG.splitterKillScore;
+                                if (this.currentWeapon === 'flak') points = CONFIG.flakKillScore;
+                                this.score += points;
                                 this.enemiesAlive--;
-                                // Spawn explosion at missile location too
                                 this.explosions.push(new Explosion(m.x, m.y));
                                 this.spawnParticles(m.x, m.y, '#aaaaaa');
                                 this.audio.play('explosion');
@@ -1030,9 +1302,9 @@
                             const dist = Math.hypot(b.x - exp.x, b.y - exp.y);
                              if (dist < exp.radius + 20) {
                                 b.active = false;
-                                this.score += 100; // Bonus for bomber
+                                this.score += CONFIG.bomberKillScore;
                                 this.explosions.push(new Explosion(b.x, b.y));
-                                this.spawnParticles(b.x, b.y, '#ff0000');
+                                this.spawnParticles(b.x, b.y, '#cc4444');
                                 this.audio.play('explosion');
                             }
                         }
@@ -1047,12 +1319,12 @@
                         this.cities.forEach(c => {
                             if (c.active) {
                                 const dist = Math.hypot(m.x - c.x, m.y - c.y);
-                                if (dist < 20) { // Hit radius
+                                if (dist < 20) {
                                     m.active = false;
                                     c.active = false;
                                     this.enemiesAlive--;
                                     this.explosions.push(new Explosion(m.x, m.y));
-                                    this.shake(15);
+                                    this.shake(CONFIG.cityHitShake);
                                     this.spawnParticles(m.x, m.y, '#ffffff');
                                     this.audio.play('hit');
                                 }
@@ -1067,7 +1339,7 @@
                             this.explosions.push(new Explosion(m.x, m.y));
 
                             this.silo.health--;
-                            this.shake(15);
+                            this.shake(CONFIG.siloHitShake);
                             this.spawnParticles(m.x, m.y, '#ffffff');
 
                             if (this.silo.health <= 0) {
@@ -1092,31 +1364,18 @@
                 }
 
                 if (this.waveMissilesLeft === 0 && this.enemiesAlive === 0 && this.bombers.length === 0 && this.explosions.length === 0) {
-                    // Wave Complete
                     this.currentState = STATE.WAVE_COMPLETE;
 
-                    // Calculate Bonus
-                    const cityBonus = this.cities.filter(c => c.active).length * 100;
-                    const ammoBonus = this.ammo * 5;
+                    const cityBonus = this.cities.filter(c => c.active).length * CONFIG.cityBonusPerCity;
+                    const ammoBonus = this.ammo * CONFIG.ammoBonusPerAmmo;
                     const totalBonus = cityBonus + ammoBonus;
 
                     this.score += totalBonus;
                     this.updateUI();
 
-                    // Show Wave Screen logic
-                    this.ui.waveTitle.innerText = `Wave ${this.wave} Complete`;
-                    this.ui.waveBonus.innerText = `City Bonus: ${cityBonus}\nAmmo Bonus: ${ammoBonus}`;
+                    this.ui.waveTitle.innerText = `WAVE ${this.wave} COMPLETE`;
+                    this.ui.waveBonus.innerHTML = `CITY BONUS: ${cityBonus}<br>AMMO BONUS: ${ammoBonus}`;
                     this.setScreen(this.ui.waveScreen);
-
-                    // Auto-start next wave after delay
-                    setTimeout(() => {
-                        this.wave++;
-                        this.ammo += CONFIG.baseAmmo; // Refill ammo? Or add partial? Let's refill.
-                        // Cap ammo? Let's keep it simple for now.
-                        this.startWave();
-                        this.setScreen(null);
-                        this.updateUI();
-                    }, 3000);
                 }
             }
 
@@ -1166,21 +1425,16 @@
                 this.currentState = STATE.GAME_OVER;
                 this.audio.play('gameover');
 
-                this.ui.finalScore.innerText = `Score: ${this.score}`;
+                this.ui.finalScore.innerText = `SCORE: ${this.score}`;
                 this.setScreen(this.ui.gameOverScreen);
 
-                // Check Leaderboard
                 if (this.score > 0 && this.checkLeaderboard(this.score)) {
-                    // Show Input, Hide Restart
                     this.ui.inputContainer.classList.remove('hidden');
                     this.ui.restartBtn.classList.add('hidden');
                     this.ui.nameInput.value = '';
                     this.ui.nameInput.focus();
-
-                    // Render current list below contextually (optional, but good)
                     this.renderLeaderboard();
                 } else {
-                    // Show List, Show Restart
                     this.ui.inputContainer.classList.add('hidden');
                     this.ui.restartBtn.classList.remove('hidden');
                     this.renderLeaderboard();
@@ -1188,15 +1442,23 @@
             }
 
             setScreen(screenElement) {
-                // Hide all
                 this.ui.startScreen.classList.add('hidden');
                 this.ui.gameOverScreen.classList.add('hidden');
                 this.ui.waveScreen.classList.add('hidden');
+                this.ui.pauseScreen.classList.add('hidden');
+                this.ui.waveAnnouncement.classList.remove('visible');
 
-                // Show specific
                 if (screenElement) {
                     screenElement.classList.remove('hidden');
                 }
+            }
+
+            showWaveAnnouncement() {
+                this.ui.waveAnnouncementText.innerText = `WAVE ${this.wave}`;
+                this.ui.waveAnnouncement.classList.add('visible');
+                setTimeout(() => {
+                    this.ui.waveAnnouncement.classList.remove('visible');
+                }, 1500);
             }
 
             loop() {
@@ -1226,8 +1488,8 @@
                            this.framesSinceLastSpawn = 0;
                        }
 
-                       // Random Bomber Spawn (Wave 5+)
-                       if (this.wave >= 5 && Math.random() < 0.001) {
+               // Random Bomber Spawn (Wave 5+)
+                        if (this.wave >= CONFIG.bomberWaveThreshold && Math.random() < CONFIG.bomberSpawnChance) {
                            this.spawnBomber();
                        }
 
@@ -1274,16 +1536,7 @@
                    this.explosions.forEach(e => e.draw(this.ctx));
                    this.particles.forEach(p => p.draw(this.ctx));
 
-                   if (this.paused) {
-                        this.ctx.save();
-                        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-                        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-                        this.ctx.fillStyle = '#ffffff';
-                        this.ctx.font = '40px Arial';
-                        this.ctx.textAlign = 'center';
-                        this.ctx.fillText("PAUSED", this.canvas.width/2, this.canvas.height/2);
-                        this.ctx.restore();
-                   }
+// Pause is handled by the overlay, not canvas text
                 }
 
                 this.ctx.restore();
