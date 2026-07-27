@@ -36,8 +36,13 @@
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            user-select: none;
             -webkit-user-select: none;
+        }
+
+        /* Allow text selection in inputs */
+        input, textarea {
+            -webkit-user-select: text;
+            user-select: text;
         }
 
         body {
@@ -83,6 +88,17 @@
             z-index: 1;
         }
 
+        /* Impact flash overlay */
+        #impactFlash {
+            position: fixed;
+            inset: 0;
+            background: white;
+            opacity: 0;
+            z-index: 5;
+            pointer-events: none;
+            transition: opacity 0.05s ease-out;
+        }
+
         /* UI Overlay */
         #ui-layer {
             position: absolute;
@@ -91,13 +107,13 @@
             width: 100%;
             height: 100%;
             z-index: 10;
-            pointer-events: none; /* Let clicks pass through to canvas when playing */
+            pointer-events: none;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
         }
 
-        /* HUD — compact terminal readout */
+        /* HUD */
         #hud {
             padding: 12px 20px;
             display: flex;
@@ -157,7 +173,66 @@
             text-shadow: 0 0 12px var(--accent-glow);
         }
 
-        /* Overlay — unified card system */
+        /* Combo display */
+        #comboDisplay {
+            position: absolute;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: 4px;
+            color: var(--accent);
+            text-shadow: 0 0 20px var(--accent-glow);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            z-index: 15;
+        }
+
+        #comboDisplay.visible {
+            opacity: 1;
+        }
+
+        /* Wave pattern indicator */
+        #wavePattern {
+            position: absolute;
+            top: 85px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.65rem;
+            letter-spacing: 3px;
+            color: var(--text-dim);
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+            z-index: 15;
+        }
+
+        #wavePattern.visible {
+            opacity: 0.7;
+        }
+
+        /* Shield indicator */
+        #shieldIndicator {
+            position: absolute;
+            top: 105px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.6rem;
+            letter-spacing: 3px;
+            color: var(--accent);
+            text-shadow: 0 0 10px var(--accent-glow);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 15;
+        }
+
+        #shieldIndicator.visible {
+            opacity: 1;
+        }
+
+        /* Overlay */
         .screen {
             position: absolute;
             inset: 0;
@@ -266,7 +341,7 @@
             box-shadow: 0 4px 25px rgba(0,0,0,0.5), var(--glow-accent);
         }
 
-        /* Wave Announcement — brief flash */
+        /* Wave Announcement */
         #waveAnnouncement {
             position: absolute;
             top: 50%;
@@ -290,6 +365,51 @@
             color: var(--text-primary);
             text-shadow: 0 0 30px rgba(255,255,255,0.4);
             white-space: nowrap;
+        }
+
+        #waveAnnouncement .wave-pattern-text {
+            display: block;
+            font-size: 0.8rem;
+            letter-spacing: 4px;
+            color: var(--text-dim);
+            margin-top: 8px;
+            text-align: center;
+        }
+
+        /* Upgrade screen */
+        .upgrade-options {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .upgrade-btn {
+            padding: 10px 16px !important;
+            font-size: 0.65rem !important;
+            letter-spacing: 2px !important;
+            border: 1px solid var(--glass-border);
+            background: var(--glass-bg);
+            color: var(--text-dim);
+            min-width: 120px;
+        }
+
+        .upgrade-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .upgrade-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .credits-display {
+            font-size: 0.7rem;
+            color: var(--accent);
+            letter-spacing: 3px;
+            margin-bottom: 1rem;
         }
 
         /* Responsive */
@@ -326,6 +446,10 @@
             }
             #waveAnnouncement .wave-text {
                 font-size: 2rem;
+            }
+            .upgrade-options {
+                flex-direction: column;
+                align-items: center;
             }
         }
 
@@ -413,6 +537,8 @@
             margin-bottom: 12px;
             outline: none;
             letter-spacing: 8px;
+            -webkit-user-select: text;
+            user-select: text;
         }
 
         #playerNameInput:focus {
@@ -423,12 +549,12 @@
         #playerNameInput::placeholder {
             color: rgba(255, 255, 255, 0.15);
         }
-
     </style>
 </head>
 <body>
 
     <canvas id="gameCanvas"></canvas>
+    <div id="impactFlash"></div>
 
     <div id="ui-layer">
         <!-- HUD -->
@@ -463,9 +589,15 @@
             </div>
         </div>
 
+        <!-- Combo Display -->
+        <div id="comboDisplay"></div>
+        <div id="wavePattern"></div>
+        <div id="shieldIndicator">SHIELD ACTIVE</div>
+
         <!-- Wave Announcement Flash -->
         <div id="waveAnnouncement">
             <span class="wave-text" id="waveAnnouncementText">WAVE 1</span>
+            <span class="wave-pattern-text" id="waveAnnouncementPattern"></span>
         </div>
 
         <!-- Start Screen -->
@@ -477,7 +609,7 @@
                    Click or tap to launch counter-measures.<br>
                    Manage your ammo carefully.</p>
                 <p style="font-size:0.65rem; letter-spacing:2px; color:var(--text-dim);">
-                    SHIFT — toggle weapon &nbsp;|&nbsp; SPACE — pause &nbsp;|&nbsp; ESC — end game
+                    SHIFT &mdash; toggle weapon &nbsp;|&nbsp; SPACE &mdash; pause &nbsp;|&nbsp; ESC &mdash; end game
                 </p>
                 <button id="startBtn" class="primary">INITIATE</button>
             </div>
@@ -506,11 +638,19 @@
             </div>
         </div>
 
-        <!-- Wave Complete Screen -->
+        <!-- Wave Complete / Upgrade Screen -->
         <div id="waveScreen" class="screen hidden">
             <div class="overlay-card">
                 <h2 id="waveTitle">WAVE 1 COMPLETE</h2>
                 <p id="waveBonus">BONUS: 0</p>
+                <div id="upgradeSection" class="hidden">
+                    <p class="credits-display">CREDITS: <span id="creditsDisplay">0</span></p>
+                    <div class="upgrade-options">
+                        <button class="upgrade-btn" id="upgradeExplosion" title="Larger explosions">EXPLOSION +10<br><small>50 CR</small></button>
+                        <button class="upgrade-btn" id="upgradeSpeed" title="Faster missiles">SPEED +1<br><small>40 CR</small></button>
+                        <button class="upgrade-btn" id="upgradeAmmo" title="More ammo next wave">AMMO +5<br><small>30 CR</small></button>
+                    </div>
+                </div>
                 <button id="nextWaveBtn" class="primary">DEPLOY</button>
             </div>
         </div>
@@ -544,11 +684,16 @@
             bomberSpawnChance: 0.001,
             splitterWaveThreshold: 3,
             splitterChance: 0.3,
+            bossWaveInterval: 5,
             // Scoring
             normalKillScore: 25,
             flakKillScore: 15,
             bomberKillScore: 100,
             splitterKillScore: 50,
+            bossKillScore: 200,
+            closeCallBonus: 10,
+            comboMultiplier: 1.5,
+            comboWindow: 2000, // ms
             // Ammo refill per wave (fraction of base)
             ammoRefillFraction: 0.75,
             // City/ammo bonus
@@ -558,11 +703,24 @@
             explosionMaxRadius: 40,
             explosionExpansionRate: 1.5,
             // Particles
-            particleCount: 10,
+            particleCount: 12,
             // Shake
             cityHitShake: 15,
             siloHitShake: 15,
             maxShake: 20,
+            // Upgrades
+            creditPerCity: 20,
+            creditPerAmmo: 2,
+            // Shield
+            shieldDuration: 6000, // ms
+            // Power-up drop chance from bombers
+            powerUpChance: 0.15,
+            // Pool sizes
+            poolMissileSize: 100,
+            poolExplosionSize: 50,
+            poolParticleSize: 200,
+            poolFloatingTextSize: 30,
+            poolPowerUpSize: 10,
         };
 
         /* ============================================================
@@ -576,27 +734,67 @@
         };
 
         /* ============================================================
-           GAME CLASSES
+           OBJECT POOL
+           ============================================================ */
+        class Pool {
+            constructor(factory, initialSize) {
+                this.pool = [];
+                this.factory = factory;
+                for (let i = 0; i < initialSize; i++) {
+                    this.pool.push(factory());
+                }
+            }
+
+            acquire() {
+                let obj = this.pool.pop();
+                if (!obj) obj = this.factory();
+                obj.active = true;
+                return obj;
+            }
+
+            release(obj) {
+                obj.active = false;
+                this.pool.push(obj);
+            }
+        }
+
+        /* ============================================================
+           SOUND MANAGER
            ============================================================ */
         class SoundManager {
             constructor() {
-                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                this.ctx = null;
                 this.enabled = true;
+                this.initialized = false;
+            }
+
+            init() {
+                if (this.initialized) return;
+                try {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    this.initialized = true;
+                } catch (e) {
+                    this.enabled = false;
+                }
+            }
+
+            resume() {
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
             }
 
             play(type) {
-                if (!this.enabled) return;
-                if (this.ctx.state === 'suspended') {
-                    this.ctx.resume();
-                }
+                if (!this.enabled || !this.ctx) return;
+                this.resume();
 
                 const now = this.ctx.currentTime;
                 const gain = this.ctx.createGain();
                 gain.connect(this.ctx.destination);
 
                 if (type === 'explosion') {
-                    // Noise buffer for explosion
-                    const bufferSize = this.ctx.sampleRate * 0.5; // 0.5 seconds
+                    // Layered explosion: sub-bass + mid crack + high hiss
+                    const bufferSize = this.ctx.sampleRate * 0.4;
                     const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
                     const data = buffer.getChannelData(0);
                     for (let i = 0; i < bufferSize; i++) {
@@ -605,19 +803,51 @@
                     const noise = this.ctx.createBufferSource();
                     noise.buffer = buffer;
 
-                    // Filter for "thud" sound
                     const filter = this.ctx.createBiquadFilter();
                     filter.type = 'lowpass';
-                    filter.frequency.setValueAtTime(1000, now);
-                    filter.frequency.exponentialRampToValueAtTime(100, now + 0.4);
+                    filter.frequency.setValueAtTime(1200, now);
+                    filter.frequency.exponentialRampToValueAtTime(80, now + 0.35);
 
                     noise.connect(filter);
                     filter.connect(gain);
 
-                    gain.gain.setValueAtTime(0.2, now);
-                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                    gain.gain.setValueAtTime(0.18, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
                     noise.start(now);
-                    noise.stop(now + 0.5);
+                    noise.stop(now + 0.4);
+
+                    // Sub-bass thump
+                    const sub = this.ctx.createOscillator();
+                    sub.type = 'sine';
+                    sub.frequency.setValueAtTime(60, now);
+                    sub.frequency.exponentialRampToValueAtTime(20, now + 0.3);
+                    const subGain = this.ctx.createGain();
+                    sub.connect(subGain);
+                    subGain.connect(this.ctx.destination);
+                    subGain.gain.setValueAtTime(0.15, now);
+                    subGain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                    sub.start(now);
+                    sub.stop(now + 0.3);
+                } else if (type === 'bigExplosion') {
+                    // City/silo destruction
+                    const bufferSize = this.ctx.sampleRate * 0.8;
+                    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        data[i] = Math.random() * 2 - 1;
+                    }
+                    const noise = this.ctx.createBufferSource();
+                    noise.buffer = buffer;
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(2000, now);
+                    filter.frequency.exponentialRampToValueAtTime(50, now + 0.7);
+                    noise.connect(filter);
+                    filter.connect(gain);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.7);
+                    noise.start(now);
+                    noise.stop(now + 0.7);
                 } else {
                     const osc = this.ctx.createOscillator();
                     osc.connect(gain);
@@ -626,7 +856,7 @@
                         osc.type = 'square';
                         osc.frequency.setValueAtTime(880, now);
                         osc.frequency.exponentialRampToValueAtTime(110, now + 0.1);
-                        gain.gain.setValueAtTime(0.1, now);
+                        gain.gain.setValueAtTime(0.08, now);
                         gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
                         osc.start(now);
                         osc.stop(now + 0.1);
@@ -634,7 +864,7 @@
                         osc.type = 'sawtooth';
                         osc.frequency.setValueAtTime(150, now);
                         osc.frequency.exponentialRampToValueAtTime(0.01, now + 0.2);
-                        gain.gain.setValueAtTime(0.2, now);
+                        gain.gain.setValueAtTime(0.15, now);
                         gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
                         osc.start(now);
                         osc.stop(now + 0.2);
@@ -662,96 +892,197 @@
                         gain.gain.linearRampToValueAtTime(0, now + 0.1);
                         osc.start(now);
                         osc.stop(now + 0.1);
+                    } else if (type === 'powerup') {
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(523, now);
+                        osc.frequency.setValueAtTime(659, now + 0.1);
+                        osc.frequency.setValueAtTime(784, now + 0.2);
+                        gain.gain.setValueAtTime(0.12, now);
+                        gain.gain.linearRampToValueAtTime(0, now + 0.4);
+                        osc.start(now);
+                        osc.stop(now + 0.4);
+                    } else if (type === 'combo') {
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(660, now);
+                        osc.frequency.setValueAtTime(880, now + 0.05);
+                        gain.gain.setValueAtTime(0.08, now);
+                        gain.gain.linearRampToValueAtTime(0, now + 0.15);
+                        osc.start(now);
+                        osc.stop(now + 0.15);
                     }
                 }
             }
         }
 
+        /* ============================================================
+           ENTITY BASE
+           ============================================================ */
         class Entity {
             constructor(x, y) {
                 this.x = x;
                 this.y = y;
-                this.active = true;
+                this.active = false;
             }
         }
 
+        /* ============================================================
+           CITY
+           ============================================================ */
         class City extends Entity {
-            constructor(x, y) {
+            constructor(x, y, shapeIndex) {
                 super(x, y);
+                this.active = true;
                 this.width = 40;
                 this.height = 20;
+                this.shapeIndex = shapeIndex; // 0, 1, or 2 for variety
+                this.shielded = false;
             }
 
             draw(ctx) {
                 if (!this.active) return;
                 ctx.save();
                 ctx.shadowBlur = 15;
-                ctx.shadowColor = 'rgba(200, 200, 200, 0.8)';
-                ctx.fillStyle = '#eeeeee';
+                ctx.shadowColor = this.shielded ? 'rgba(0, 229, 255, 0.6)' : 'rgba(200, 200, 200, 0.8)';
+                ctx.fillStyle = this.shielded ? '#a0e8ff' : '#eeeeee';
 
-                // Draw a city shape (simple geometric)
-                ctx.beginPath();
-                ctx.moveTo(this.x - 20, this.y);
-                ctx.lineTo(this.x - 15, this.y - 10);
-                ctx.lineTo(this.x - 5, this.y - 10);
-                ctx.lineTo(this.x - 5, this.y - 15);
-                ctx.lineTo(this.x + 5, this.y - 15);
-                ctx.lineTo(this.x + 5, this.y - 8);
-                ctx.lineTo(this.x + 15, this.y - 8);
-                ctx.lineTo(this.x + 20, this.y);
-                ctx.fill();
+                if (this.shapeIndex === 0) {
+                    // Tall building cluster
+                    ctx.beginPath();
+                    ctx.moveTo(this.x - 20, this.y);
+                    ctx.lineTo(this.x - 18, this.y - 12);
+                    ctx.lineTo(this.x - 10, this.y - 12);
+                    ctx.lineTo(this.x - 10, this.y - 20);
+                    ctx.lineTo(this.x - 2, this.y - 20);
+                    ctx.lineTo(this.x - 2, this.y - 10);
+                    ctx.lineTo(this.x + 5, this.y - 10);
+                    ctx.lineTo(this.x + 5, this.y - 16);
+                    ctx.lineTo(this.x + 15, this.y - 16);
+                    ctx.lineTo(this.x + 20, this.y);
+                    ctx.fill();
+                } else if (this.shapeIndex === 1) {
+                    // Dome structure
+                    ctx.beginPath();
+                    ctx.moveTo(this.x - 20, this.y);
+                    ctx.lineTo(this.x - 18, this.y - 8);
+                    ctx.arc(this.x, this.y - 8, 18, Math.PI, 0);
+                    ctx.lineTo(this.x + 20, this.y);
+                    ctx.fill();
+                } else {
+                    // Industrial complex
+                    ctx.beginPath();
+                    ctx.moveTo(this.x - 20, this.y);
+                    ctx.lineTo(this.x - 15, this.y - 10);
+                    ctx.lineTo(this.x - 5, this.y - 10);
+                    ctx.lineTo(this.x - 5, this.y - 15);
+                    ctx.lineTo(this.x + 5, this.y - 15);
+                    ctx.lineTo(this.x + 5, this.y - 8);
+                    ctx.lineTo(this.x + 15, this.y - 8);
+                    ctx.lineTo(this.x + 20, this.y);
+                    ctx.fill();
+                }
+
+                // Shield bubble
+                if (this.shielded) {
+                    ctx.globalAlpha = 0.3 + Math.sin(Date.now() * 0.005) * 0.1;
+                    ctx.strokeStyle = '#00e5ff';
+                    ctx.lineWidth = 2;
+                    ctx.shadowColor = '#00e5ff';
+                    ctx.shadowBlur = 10;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y - 10, 28, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
                 ctx.restore();
             }
         }
 
+        /* ============================================================
+           SILO
+           ============================================================ */
         class Silo extends Entity {
             constructor(x, y) {
                 super(x, y);
+                this.active = true;
                 this.maxHealth = 3;
                 this.health = this.maxHealth;
             }
 
             draw(ctx, ammo) {
-                if (this.health <= 0) return; // Destroyed
+                if (this.health <= 0) return;
 
                 ctx.save();
+
+                // Health-based color
+                let fillColor, healthColor;
+                if (this.health === 3) {
+                    fillColor = '#ffffff';
+                    healthColor = '#e0e0e0';
+                } else if (this.health === 2) {
+                    fillColor = '#aaaaaa';
+                    healthColor = '#aaaaaa';
+                } else {
+                    fillColor = '#ff5555';
+                    healthColor = '#cc4444';
+                }
+
                 ctx.shadowBlur = 20;
-                ctx.shadowColor = '#ffffff';
+                ctx.shadowColor = fillColor;
 
-                // Color based on health
-                if (this.health === 3) ctx.fillStyle = '#ffffff';
-                else if (this.health === 2) ctx.fillStyle = '#aaaaaa';
-                else ctx.fillStyle = '#ff5555';
+                // Launch tube
+                ctx.fillStyle = '#333333';
+                ctx.fillRect(this.x - 4, this.y - 35, 8, 15);
 
-                // Dome shape
+                // Dome
+                ctx.fillStyle = fillColor;
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, 30, Math.PI, 0);
                 ctx.fill();
 
+                // Antenna
+                ctx.strokeStyle = fillColor;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y - 30);
+                ctx.lineTo(this.x, this.y - 42);
+                ctx.stroke();
+
+                // Antenna tip (pulsing)
+                const pulse = Math.sin(Date.now() * 0.003) * 0.3 + 0.7;
+                ctx.globalAlpha = pulse;
+                ctx.fillStyle = '#00e5ff';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y - 42, 3, 0, Math.PI * 2);
+                ctx.fill();
+
                 // Ammo indicator
                 if (ammo > 0) {
+                    ctx.globalAlpha = 1;
                     ctx.fillStyle = '#000000';
                     ctx.font = '12px Courier New';
                     ctx.textAlign = 'center';
                     ctx.fillText(ammo, this.x, this.y - 10);
                 }
 
-                // Health Indicator (simple dots below)
-                if (this.health === 3) ctx.fillStyle = '#e0e0e0';
-                else if (this.health === 2) ctx.fillStyle = '#aaaaaa';
-                else ctx.fillStyle = '#cc4444';
-                for(let i=0; i<this.health; i++) {
-                    ctx.fillRect(this.x - 15 + (i*12), this.y + 5, 8, 4);
+                // Health bars
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = healthColor;
+                for (let i = 0; i < this.health; i++) {
+                    ctx.fillRect(this.x - 15 + (i * 12), this.y + 5, 8, 4);
                 }
 
                 ctx.restore();
             }
         }
 
+        /* ============================================================
+           BOMBER
+           ============================================================ */
         class Bomber extends Entity {
             constructor(y, speed) {
                 const startLeft = Math.random() > 0.5;
                 super(startLeft ? -30 : window.innerWidth + 30, y);
+                this.active = true;
                 this.vx = startLeft ? speed : -speed;
                 this.width = 40;
                 this.height = 15;
@@ -759,18 +1090,16 @@
                 this.dropInterval = 60 + Math.random() * 60;
             }
 
-            update(game) {
-                this.x += this.vx;
+            update(game, dt) {
+                this.x += this.vx * dt;
 
-                // Drop Logic
                 this.lastDropTime++;
                 if (this.lastDropTime > this.dropInterval) {
-                     game.spawnEnemyMissile(this.x, this.y);
-                     this.lastDropTime -= this.dropInterval;
-                     this.dropInterval = 60 + Math.random() * 120; // Reset interval
+                    game.spawnEnemyMissile(this.x, this.y);
+                    this.lastDropTime -= this.dropInterval;
+                    this.dropInterval = 60 + Math.random() * 120;
                 }
 
-                // Off screen check
                 if ((this.vx > 0 && this.x > game.canvas.width + 50) ||
                     (this.vx < 0 && this.x < -50)) {
                     this.active = false;
@@ -783,7 +1112,7 @@
                 ctx.shadowColor = '#cc4444';
                 ctx.fillStyle = '#cc4444';
 
-                // UFO Shape
+                // UFO body
                 ctx.beginPath();
                 ctx.ellipse(this.x, this.y, 20, 8, 0, 0, Math.PI * 2);
                 ctx.fill();
@@ -794,58 +1123,79 @@
                 ctx.arc(this.x, this.y - 5, 8, Math.PI, 0);
                 ctx.fill();
 
+                // Pulsing light underneath
+                const pulse = Math.sin(Date.now() * 0.008) * 0.5 + 0.5;
+                ctx.globalAlpha = pulse * 0.6;
+                ctx.fillStyle = '#ff4444';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y + 4, 3, 0, Math.PI * 2);
+                ctx.fill();
+
                 ctx.restore();
             }
         }
 
+        /* ============================================================
+           MISSILE
+           ============================================================ */
         class Missile extends Entity {
-            constructor(startX, startY, targetX, targetY, speed, isEnemy = false, type = 'normal') {
-                super(startX, startY);
-                this.startX = startX;
-                this.startY = startY;
-                this.targetX = targetX;
-                this.targetY = targetY;
+            constructor() {
+                super(0, 0);
+                this.startX = 0; this.startY = 0;
+                this.targetX = 0; this.targetY = 0;
+                this.speed = 0;
+                this.isEnemy = false;
+                this.type = 'normal';
+                this.velocityX = 0; this.velocityY = 0;
+                this.splitAltitude = 0;
+                this.trail = [];
+                this.health = 1; // For boss missiles
+            }
+
+            init(startX, startY, targetX, targetY, speed, isEnemy, type) {
+                this.x = startX; this.y = startY;
+                this.startX = startX; this.startY = startY;
+                this.targetX = targetX; this.targetY = targetY;
                 this.speed = speed;
                 this.isEnemy = isEnemy;
                 this.type = type;
+                this.health = type === 'boss' ? 2 : 1;
 
                 const angle = Math.atan2(targetY - startY, targetX - startX);
                 this.velocityX = Math.cos(angle) * speed;
                 this.velocityY = Math.sin(angle) * speed;
 
-                // Split Altitude for splitter
                 if (type === 'splitter') {
                     this.splitAltitude = 100 + Math.random() * 150;
                 }
 
-                // Trail
                 this.trail = [];
+                this.active = true;
             }
 
-            update(game) {
+            update(game, dt) {
                 this.trail.push({x: this.x, y: this.y, age: 0});
 
-                this.x += this.velocityX;
-                this.y += this.velocityY;
+                this.x += this.velocityX * dt;
+                this.y += this.velocityY * dt;
 
-                // Split Logic
+                // Split logic
                 if (this.isEnemy && this.active && this.type === 'splitter' && this.y >= this.splitAltitude) {
                     this.active = false;
-                    game.enemiesAlive--; // Account for the splitter itself being destroyed
+                    game.enemiesAlive--;
                     game.triggerSplit(this.x, this.y);
-                    return;
+                    return false;
                 }
 
-                // Check if reached target (for player missiles) or went off screen/hit ground (for enemy)
+                // Player missile reached target
                 if (!this.isEnemy) {
-                    // Distance check for player missiles to detonate at target
                     const dist = Math.hypot(this.x - this.targetX, this.y - this.targetY);
-                    if (dist < this.speed) {
+                    if (dist < this.speed * dt) {
                         this.active = false;
                         return true; // Trigger explosion
                     }
                 }
-                // Enemy missiles going off-screen are handled in Game.loop to track enemiesAlive correctly
+
                 return false;
             }
 
@@ -853,10 +1203,12 @@
                 ctx.save();
                 ctx.shadowBlur = 10;
 
-                // Color based on type
                 if (this.type === 'splitter') {
                     ctx.shadowColor = '#ff00ff';
                     ctx.strokeStyle = '#ff00ff';
+                } else if (this.type === 'boss') {
+                    ctx.shadowColor = '#ff4400';
+                    ctx.strokeStyle = '#ff4400';
                 } else if (this.type === 'flak' && !this.isEnemy) {
                     ctx.shadowColor = '#00ffff';
                     ctx.strokeStyle = '#00ffff';
@@ -865,7 +1217,7 @@
                     ctx.strokeStyle = this.isEnemy ? '#cccccc' : '#ffffff';
                 }
 
-                ctx.lineWidth = 2;
+                ctx.lineWidth = this.type === 'boss' ? 3 : 2;
 
                 // Draw Head
                 ctx.beginPath();
@@ -873,17 +1225,28 @@
                 ctx.lineTo(this.x, this.y);
                 ctx.stroke();
 
-                // Draw Trail
-                ctx.beginPath();
+                // Boss missile warhead indicator
+                if (this.type === 'boss') {
+                    ctx.fillStyle = '#ff4400';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Draw Trail as fading dots
                 for (let i = 0; i < this.trail.length; i++) {
                     const point = this.trail[i];
                     point.age++;
-                    if (point.age > 20) continue; // Fade out length
+                    if (point.age > 20) continue;
 
-                    ctx.globalAlpha = 1 - (point.age / 20);
-                    ctx.lineTo(point.x, point.y);
+                    const alpha = 1 - (point.age / 20);
+                    const radius = 2 * alpha;
+                    ctx.globalAlpha = alpha;
+                    ctx.fillStyle = ctx.strokeStyle;
+                    ctx.beginPath();
+                    ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+                    ctx.fill();
                 }
-                ctx.stroke();
 
                 ctx.restore();
 
@@ -892,23 +1255,37 @@
             }
         }
 
+        /* ============================================================
+           EXPLOSION
+           ============================================================ */
         class Explosion extends Entity {
-            constructor(x, y) {
-                super(x, y);
+            constructor() {
+                super(0, 0);
                 this.radius = 1;
                 this.maxRadius = CONFIG.explosionMaxRadius;
                 this.expansionRate = CONFIG.explosionExpansionRate;
                 this.isRetracting = false;
+                this.isFlak = false;
             }
 
-            update() {
+            init(x, y, isFlak, maxRadius) {
+                this.x = x; this.y = y;
+                this.radius = 1;
+                this.maxRadius = maxRadius || CONFIG.explosionMaxRadius;
+                this.expansionRate = CONFIG.explosionExpansionRate;
+                this.isRetracting = false;
+                this.isFlak = isFlak || false;
+                this.active = true;
+            }
+
+            update(dt) {
                 if (!this.isRetracting) {
-                    this.radius += this.expansionRate;
+                    this.radius += this.expansionRate * dt;
                     if (this.radius >= this.maxRadius) {
                         this.isRetracting = true;
                     }
                 } else {
-                    this.radius -= this.expansionRate;
+                    this.radius -= this.expansionRate * dt;
                     if (this.radius <= 0) {
                         this.active = false;
                     }
@@ -917,19 +1294,33 @@
 
             draw(ctx) {
                 ctx.save();
-                ctx.shadowBlur = 30;
+
+                const progress = this.radius / this.maxRadius;
+                const alpha = this.isRetracting ? (this.radius / this.maxRadius) : 0.8;
+
+                // Core flash (bright white)
+                ctx.globalAlpha = alpha;
+                ctx.shadowBlur = 25;
                 ctx.shadowColor = '#ffffff';
                 ctx.fillStyle = '#ffffff';
-                ctx.globalAlpha = 0.8;
-
                 ctx.beginPath();
-                ctx.arc(this.x, this.y, Math.max(0, this.radius), 0, Math.PI * 2);
+                ctx.arc(this.x, this.y, Math.max(0, this.radius * 0.4), 0, Math.PI * 2);
                 ctx.fill();
 
-                // Shockwave Ring
-                ctx.globalAlpha = 0.5;
-                ctx.strokeStyle = '#ffffff';
+                // Shockwave ring
+                ctx.globalAlpha = alpha * 0.6;
+                ctx.strokeStyle = this.isFlak ? '#00e5ff' : '#ffffff';
                 ctx.lineWidth = 2;
+                ctx.shadowColor = this.isFlak ? '#00e5ff' : '#ffffff';
+                ctx.shadowBlur = 15;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, Math.max(0, this.radius), 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Outer glow ring
+                ctx.globalAlpha = alpha * 0.3;
+                ctx.strokeStyle = this.isFlak ? 'rgba(0, 229, 255, 0.5)' : 'rgba(200, 200, 200, 0.5)';
+                ctx.lineWidth = 1;
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, Math.max(0, this.radius * 0.7), 0, Math.PI * 2);
                 ctx.stroke();
@@ -938,20 +1329,34 @@
             }
         }
 
+        /* ============================================================
+           PARTICLE
+           ============================================================ */
         class Particle extends Entity {
-            constructor(x, y, color) {
-                super(x, y);
-                this.vx = (Math.random() - 0.5) * 4;
-                this.vy = (Math.random() - 0.5) * 4;
+            constructor() {
+                super(0, 0);
+                this.vx = 0; this.vy = 0;
+                this.life = 1.0;
+                this.decay = 0.02;
+                this.color = '#ffffff';
+                this.size = 2;
+            }
+
+            init(x, y, color) {
+                this.x = x; this.y = y;
+                this.vx = (Math.random() - 0.5) * 5;
+                this.vy = (Math.random() - 0.5) * 5;
                 this.life = 1.0;
                 this.decay = Math.random() * 0.03 + 0.01;
                 this.color = color || '#ffffff';
+                this.size = Math.random() * 2 + 1;
+                this.active = true;
             }
 
-            update() {
-                this.x += this.vx;
-                this.y += this.vy;
-                this.life -= this.decay;
+            update(dt) {
+                this.x += this.vx * dt;
+                this.y += this.vy * dt;
+                this.life -= this.decay * dt;
                 if (this.life <= 0) this.active = false;
             }
 
@@ -961,11 +1366,235 @@
                 ctx.fillStyle = this.color;
                 ctx.shadowBlur = 5;
                 ctx.shadowColor = this.color;
-                ctx.fillRect(this.x, this.y, 2, 2);
+                ctx.fillRect(this.x - this.size / 2, this.y - this.size / 2, this.size, this.size);
                 ctx.restore();
             }
         }
 
+        /* ============================================================
+           FLOATING TEXT (Score popups, combo text)
+           ============================================================ */
+        class FloatingText extends Entity {
+            constructor() {
+                super(0, 0);
+                this.text = '';
+                this.color = '#ffffff';
+                this.life = 1.0;
+                this.vy = -1;
+                this.size = 14;
+            }
+
+            init(x, y, text, color, size) {
+                this.x = x; this.y = y;
+                this.text = text;
+                this.color = color || '#ffffff';
+                this.life = 1.0;
+                this.vy = -(1 + Math.random() * 0.5);
+                this.size = size || 14;
+                this.active = true;
+            }
+
+            update(dt) {
+                this.y += this.vy * dt;
+                this.life -= 0.015 * dt;
+                if (this.life <= 0) this.active = false;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                ctx.font = `${this.size}px Courier New`;
+                ctx.textAlign = 'center';
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = this.color;
+                ctx.fillText(this.text, this.x, this.y);
+                ctx.restore();
+            }
+        }
+
+        /* ============================================================
+           POWER-UP
+           ============================================================ */
+        class PowerUp extends Entity {
+            constructor() {
+                super(0, 0);
+                this.type = 'ammo'; // ammo, shield, nuke
+                this.vy = 0.5;
+                this.size = 12;
+            }
+
+            init(x, y, type) {
+                this.x = x; this.y = y;
+                this.type = type;
+                this.vy = 0.5;
+                this.active = true;
+            }
+
+            update(dt) {
+                this.y += this.vy * dt;
+                if (this.y > window.innerHeight - 30) {
+                    this.active = false;
+                }
+            }
+
+            draw(ctx) {
+                ctx.save();
+                const pulse = Math.sin(Date.now() * 0.006) * 0.3 + 0.7;
+
+                let color, label;
+                switch (this.type) {
+                    case 'ammo':
+                        color = '#00e5ff';
+                        label = '+A';
+                        break;
+                    case 'shield':
+                        color = '#44ff44';
+                        label = 'SH';
+                        break;
+                    case 'nuke':
+                        color = '#ff4444';
+                        label = 'NU';
+                        break;
+                }
+
+                ctx.globalAlpha = pulse;
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = color;
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+
+                // Diamond shape
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y - this.size);
+                ctx.lineTo(this.x + this.size, this.y);
+                ctx.lineTo(this.x, this.y + this.size);
+                ctx.lineTo(this.x - this.size, this.y);
+                ctx.closePath();
+                ctx.stroke();
+
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = color;
+                ctx.font = 'bold 10px Courier New';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(label, this.x, this.y);
+
+                ctx.restore();
+            }
+        }
+
+        /* ============================================================
+           DELAYED ACTION QUEUE (replaces setTimeout for flak)
+           ============================================================ */
+        class DelayedActionQueue {
+            constructor() {
+                this.actions = [];
+            }
+
+            schedule(frames, callback) {
+                this.actions.push({ framesLeft: frames, callback });
+            }
+
+            update(dt) {
+                for (let i = this.actions.length - 1; i >= 0; i--) {
+                    this.actions[i].framesLeft -= dt;
+                    if (this.actions[i].framesLeft <= 0) {
+                        this.actions[i].callback();
+                        this.actions.splice(i, 1);
+                    }
+                }
+            }
+
+            clear() {
+                this.actions = [];
+            }
+        }
+
+        /* ============================================================
+           STARFIELD
+           ============================================================ */
+        class Starfield {
+            constructor() {
+                this.stars = [];
+                this.generate();
+            }
+
+            generate() {
+                this.stars = [];
+                const count = 120;
+                for (let i = 0; i < count; i++) {
+                    this.stars.push({
+                        x: Math.random(),
+                        y: Math.random() * 0.7, // Only in upper 70%
+                        size: Math.random() * 1.5 + 0.5,
+                        alpha: Math.random() * 0.6 + 0.2,
+                        twinkleSpeed: Math.random() * 0.002 + 0.001,
+                        twinkleOffset: Math.random() * Math.PI * 2,
+                    });
+                }
+            }
+
+            draw(ctx, w, h) {
+                const time = Date.now();
+                for (const star of this.stars) {
+                    const twinkle = Math.sin(time * star.twinkleSpeed + star.twinkleOffset) * 0.3 + 0.7;
+                    ctx.globalAlpha = star.alpha * twinkle;
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(star.x * w, star.y * h, star.size, star.size);
+                }
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        /* ============================================================
+           TERRAIN
+           ============================================================ */
+        class Terrain {
+            constructor() {
+                this.points = [];
+                this.generate();
+            }
+
+            generate() {
+                this.points = [];
+                const segments = 60;
+                for (let i = 0; i <= segments; i++) {
+                    const x = i / segments;
+                    // Multi-octave noise for natural look
+                    const h = Math.sin(i * 0.3) * 0.15 +
+                              Math.sin(i * 0.7 + 1) * 0.08 +
+                              Math.sin(i * 1.3 + 2) * 0.04;
+                    this.points.push({ x, h });
+                }
+            }
+
+            draw(ctx, w, h) {
+                const baseY = h - 20;
+                const maxH = 60;
+
+                ctx.save();
+                ctx.fillStyle = '#0a0a0a';
+                ctx.strokeStyle = '#1a1a1a';
+                ctx.lineWidth = 1;
+
+                ctx.beginPath();
+                ctx.moveTo(0, baseY);
+                for (const pt of this.points) {
+                    ctx.lineTo(pt.x * w, baseY - (pt.h + 0.25) * maxH);
+                }
+                ctx.lineTo(w, baseY);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.restore();
+            }
+        }
+
+        /* ============================================================
+           MAIN GAME
+           ============================================================ */
         class Game {
             constructor() {
                 this.canvas = document.getElementById('gameCanvas');
@@ -977,10 +1606,12 @@
                 // Game Entities
                 this.cities = [];
                 this.silo = null;
-                this.missiles = []; // Both friend and foe
+                this.missiles = [];
                 this.bombers = [];
                 this.explosions = [];
                 this.particles = [];
+                this.floatingTexts = [];
+                this.powerUps = [];
 
                 // Screen Shake
                 this.shakeStrength = 0;
@@ -996,14 +1627,55 @@
                     leaderboard = [];
                 }
                 this.leaderboard = leaderboard;
-                // Use the highest score from leaderboard or 0
                 this.highScore = this.leaderboard.length > 0 ? this.leaderboard[0].score : 0;
+
                 this.wave = 1;
                 this.waveStartTime = performance.now();
                 this.ammo = CONFIG.baseAmmo;
                 this.paused = false;
 
-               // UI Elements
+                // Combo tracking
+                this.comboCount = 0;
+                this.comboTimer = 0;
+                this.lastKillTime = 0;
+
+                // Upgrades
+                this.credits = 0;
+                this.explosionUpgrade = 0;
+                this.speedUpgrade = 0;
+                this.ammoBonusUpgrade = 0;
+
+                // Shield
+                this.shieldActive = false;
+                this.shieldEndTime = 0;
+                this.shieldedCityIndex = -1;
+
+                // Delayed action queue (replaces setTimeout)
+                this.delayedActions = new DelayedActionQueue();
+
+                // Starfield & terrain
+                this.starfield = new Starfield();
+                this.terrain = new Terrain();
+
+                // Mouse position for trajectory preview
+                this.mouseX = 0;
+                this.mouseY = 0;
+                this.isMouseOnCanvas = false;
+
+                // HiDPI
+                this.dpr = window.devicePixelRatio || 1;
+
+                // Delta time tracking
+                this.lastFrameTime = performance.now();
+
+                // Pools
+                this.missilePool = new Pool(() => new Missile(), CONFIG.poolMissileSize);
+                this.explosionPool = new Pool(() => new Explosion(), CONFIG.poolExplosionSize);
+                this.particlePool = new Pool(() => new Particle(), CONFIG.poolParticleSize);
+                this.floatingTextPool = new Pool(() => new FloatingText(), CONFIG.poolFloatingTextSize);
+                this.powerUpPool = new Pool(() => new PowerUp(), CONFIG.poolPowerUpSize);
+
+                // UI Elements
                 this.ui = {
                     startScreen: document.getElementById('startScreen'),
                     gameOverScreen: document.getElementById('gameOverScreen'),
@@ -1011,6 +1683,7 @@
                     pauseScreen: document.getElementById('pauseScreen'),
                     waveAnnouncement: document.getElementById('waveAnnouncement'),
                     waveAnnouncementText: document.getElementById('waveAnnouncementText'),
+                    waveAnnouncementPattern: document.getElementById('waveAnnouncementPattern'),
                     score: document.getElementById('scoreDisplay'),
                     highScore: document.getElementById('highScoreDisplay'),
                     waveNum: document.getElementById('waveDisplay'),
@@ -1022,6 +1695,12 @@
                     hud: document.getElementById('hud'),
                     weaponDisplay: document.getElementById('weaponDisplay'),
                     weaponToggle: document.getElementById('weaponToggle'),
+                    comboDisplay: document.getElementById('comboDisplay'),
+                    wavePattern: document.getElementById('wavePattern'),
+                    shieldIndicator: document.getElementById('shieldIndicator'),
+                    impactFlash: document.getElementById('impactFlash'),
+                    upgradeSection: document.getElementById('upgradeSection'),
+                    creditsDisplay: document.getElementById('creditsDisplay'),
 
                     // High Score UI
                     inputContainer: document.getElementById('highScoreInputContainer'),
@@ -1038,7 +1717,10 @@
                 window.addEventListener('keydown', (e) => this.handleKey(e));
 
                 // Event Listeners
-                document.getElementById('startBtn').addEventListener('click', () => this.startGame());
+                document.getElementById('startBtn').addEventListener('click', () => {
+                    this.audio.init();
+                    this.startGame();
+                });
                 this.ui.restartBtn.addEventListener('click', () => this.startGame());
                 this.ui.submitBtn.addEventListener('click', () => this.submitHighScore());
 
@@ -1056,32 +1738,57 @@
                     }
                 });
 
+                // Upgrade buttons
+                document.getElementById('upgradeExplosion').addEventListener('click', () => this.buyUpgrade('explosion'));
+                document.getElementById('upgradeSpeed').addEventListener('click', () => this.buyUpgrade('speed'));
+                document.getElementById('upgradeAmmo').addEventListener('click', () => this.buyUpgrade('ammo'));
+
                 // Next wave button
                 this.ui.nextWaveBtn.addEventListener('click', () => {
                     this.wave++;
-                    this.ammo = Math.floor(CONFIG.baseAmmo * CONFIG.ammoRefillFraction);
+                    const refill = Math.floor(CONFIG.baseAmmo * CONFIG.ammoRefillFraction) + this.ammoBonusUpgrade;
+                    this.ammo = refill;
                     this.startWave();
                     this.setScreen(null);
                     this.updateUI();
                 });
 
                 // Input Handling
+                this.canvas.addEventListener('mousemove', (e) => {
+                    this.mouseX = e.clientX;
+                    this.mouseY = e.clientY;
+                    this.isMouseOnCanvas = true;
+                });
+                this.canvas.addEventListener('mouseleave', () => {
+                    this.isMouseOnCanvas = false;
+                });
                 this.canvas.addEventListener('mousedown', (e) => this.handleInput(e.clientX, e.clientY));
                 this.canvas.addEventListener('touchstart', (e) => {
                     e.preventDefault();
                     const touch = e.touches[0];
+                    this.mouseX = touch.clientX;
+                    this.mouseY = touch.clientY;
+                    this.isMouseOnCanvas = true;
                     this.handleInput(touch.clientX, touch.clientY);
                 }, {passive: false});
+                this.canvas.addEventListener('touchmove', (e) => {
+                    const touch = e.touches[0];
+                    this.mouseX = touch.clientX;
+                    this.mouseY = touch.clientY;
+                });
+                this.canvas.addEventListener('touchend', () => {
+                    this.isMouseOnCanvas = false;
+                });
 
                 // Render High Score immediately
                 this.updateUI();
             }
 
-           handleKey(e) {
+            handleKey(e) {
                 if (e.code === "Escape") {
-                     if (this.currentState === STATE.PLAYING || this.currentState === STATE.WAVE_COMPLETE) {
-                         this.endGame();
-                     }
+                    if (this.currentState === STATE.PLAYING || this.currentState === STATE.WAVE_COMPLETE) {
+                        this.endGame();
+                    }
                 }
                 if (e.code === "Space") {
                     if (this.currentState === STATE.PLAYING) {
@@ -1094,13 +1801,13 @@
                     }
                 }
                 if (e.key === "Shift") {
-                     if (this.currentState === STATE.PLAYING) {
-                         this.toggleWeapon();
-                     }
+                    if (this.currentState === STATE.PLAYING) {
+                        this.toggleWeapon();
+                    }
                 }
             }
 
-           toggleWeapon() {
+            toggleWeapon() {
                 if (this.currentWeapon === 'normal') {
                     this.currentWeapon = 'flak';
                     this.ui.weaponDisplay.innerText = "FLAK (3)";
@@ -1132,17 +1839,23 @@
                 // Create player missile from silo to click point
                 const startX = this.silo.x;
                 const startY = this.silo.y;
-                const speed = 15; // Fast player missiles
+                const speed = 15 + this.speedUpgrade;
 
-                this.missiles.push(new Missile(startX, startY, x, y, speed, false, this.currentWeapon));
+                const missile = this.missilePool.acquire();
+                missile.init(startX, startY, x, y, speed, false, this.currentWeapon);
+                this.missiles.push(missile);
             }
 
             resizeCanvas() {
-                this.canvas.width = window.innerWidth;
-                this.canvas.height = window.innerHeight;
+                this.dpr = window.devicePixelRatio || 1;
+                this.canvas.width = window.innerWidth * this.dpr;
+                this.canvas.height = window.innerHeight * this.dpr;
+                this.canvas.style.width = window.innerWidth + 'px';
+                this.canvas.style.height = window.innerHeight + 'px';
+                this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
             }
 
-          updateUI() {
+            updateUI() {
                 this.ui.score.innerText = this.score;
                 this.ui.highScore.innerText = this.highScore;
                 this.ui.waveNum.innerText = this.wave;
@@ -1151,21 +1864,22 @@
             }
 
             initLevel() {
-                 const w = this.canvas.width;
-                 const h = this.canvas.height;
-                 const citySpacing = w / (CONFIG.cityCount + 3); // +3 to account for gaps and silo
+                const w = window.innerWidth;
+                const h = window.innerHeight;
+                const citySpacing = w / (CONFIG.cityCount + 3);
 
-                 this.cities = [];
-                 // 3 cities left
-                 for(let i=1; i<=3; i++) {
-                     this.cities.push(new City(citySpacing * i, h - 20));
-                 }
-                 // 3 cities right
-                 for(let i=1; i<=3; i++) {
-                     this.cities.push(new City(w - (citySpacing * i), h - 20));
-                 }
+                this.cities = [];
+                // 3 cities left with shape variety
+                const shapes = [0, 1, 2];
+                for (let i = 1; i <= 3; i++) {
+                    this.cities.push(new City(citySpacing * i, h - 20, shapes[i - 1]));
+                }
+                // 3 cities right
+                for (let i = 1; i <= 3; i++) {
+                    this.cities.push(new City(w - (citySpacing * i), h - 20, shapes[5 - i]));
+                }
 
-                 this.silo = new Silo(w / 2, h - 20);
+                this.silo = new Silo(w / 2, h - 20);
             }
 
             startGame() {
@@ -1177,11 +1891,24 @@
                 this.bombers = [];
                 this.explosions = [];
                 this.particles = [];
+                this.floatingTexts = [];
+                this.powerUps = [];
                 this.shakeStrength = 0;
                 this.paused = false;
                 this.currentWeapon = 'normal';
+                this.comboCount = 0;
+                this.comboTimer = 0;
+                this.credits = 0;
+                this.explosionUpgrade = 0;
+                this.speedUpgrade = 0;
+                this.ammoBonusUpgrade = 0;
+                this.shieldActive = false;
+                this.delayedActions.clear();
                 this.ui.weaponToggle.classList.remove('flak-active');
                 this.ui.weaponDisplay.innerText = "NORMAL";
+                this.ui.shieldIndicator.classList.remove('visible');
+                this.ui.comboDisplay.classList.remove('visible');
+                this.ui.wavePattern.classList.remove('visible');
 
                 this.initLevel();
                 this.updateUI();
@@ -1190,75 +1917,136 @@
                 this.startWave();
                 this.showWaveAnnouncement();
 
-                // Start Loop
+                // Start Loop - ensure only one runs
                 if (!this.loopRunning) {
                     this.loopRunning = true;
+                    this.lastFrameTime = performance.now();
                     this.loop();
                 }
             }
 
-           startWave() {
+            startWave() {
                 this.currentState = STATE.PLAYING;
                 this.waveMissilesLeft = CONFIG.waveMissileBase + (this.wave * CONFIG.waveMissilePerWave);
                 this.enemySpawnRate = Math.max(CONFIG.waveSpawnRateMin, CONFIG.waveSpawnRateBase - (this.wave * 5));
                 this.framesSinceLastSpawn = 0;
                 this.enemiesAlive = 0;
 
+                // Determine wave pattern
+                this.wavePattern = 'standard';
+                if (this.wave > 1 && this.wave % 3 === 0) {
+                    this.wavePattern = 'barrage';
+                    this.enemySpawnRate = Math.max(8, this.enemySpawnRate - 15);
+                } else if (this.wave > 1 && this.wave % 4 === 0) {
+                    this.wavePattern = 'focused';
+                }
+
+                // Last city desperation mode
+                const activeCities = this.cities.filter(c => c.active).length;
+                if (activeCities <= 1 && this.wave > 2) {
+                    this.enemySpawnRate = Math.max(20, this.enemySpawnRate + 10);
+                }
+
                 this.ui.waveNum.innerText = this.wave;
+
+                // Show wave pattern
+                const patternText = document.getElementById('waveAnnouncementPattern');
+                const patternDisplay = this.ui.wavePattern;
+                switch (this.wavePattern) {
+                    case 'barrage':
+                        patternText.textContent = 'BARRAGE INCOMING';
+                        patternDisplay.textContent = '[ BARRAGE ]';
+                        patternDisplay.classList.add('visible');
+                        break;
+                    case 'focused':
+                        patternText.textContent = 'FOCUSED ATTACK';
+                        patternDisplay.textContent = '[ FOCUSED ]';
+                        patternDisplay.classList.add('visible');
+                        break;
+                    default:
+                        patternText.textContent = '';
+                        patternDisplay.classList.remove('visible');
+                }
             }
 
-           spawnEnemy() {
+            spawnEnemy() {
                 let type = 'normal';
-                if (this.wave >= CONFIG.splitterWaveThreshold && Math.random() < CONFIG.splitterChance) {
+
+                // Boss missile every 5 waves
+                if (this.wave % CONFIG.bossWaveInterval === 0 && this.waveMissilesLeft === Math.floor((CONFIG.waveMissileBase + (this.wave * CONFIG.waveMissilePerWave)) * 0.5)) {
+                    type = 'boss';
+                } else if (this.wave >= CONFIG.splitterWaveThreshold && Math.random() < CONFIG.splitterChance) {
                     type = 'splitter';
                 }
 
-                const startX = Math.random() * this.canvas.width;
+                const startX = Math.random() * window.innerWidth;
                 const startY = -20;
 
                 const targets = [...this.cities.filter(c => c.active), this.silo];
                 if (targets.length === 0) return;
 
-                const target = targets[Math.floor(Math.random() * targets.length)];
-                const speed = CONFIG.waveMissileSpeedBase + (this.wave * CONFIG.waveMissileSpeedPerWave);
+                let target;
+                if (this.wavePattern === 'focused') {
+                    // 70% chance to target the same city
+                    if (!this._focusedTarget || Math.random() < 0.7) {
+                        this._focusedTarget = targets[Math.floor(Math.random() * targets.length)];
+                    }
+                    target = this._focusedTarget;
+                } else {
+                    target = targets[Math.floor(Math.random() * targets.length)];
+                    this._focusedTarget = null;
+                }
 
-                this.missiles.push(new Missile(startX, startY, target.x, target.y, speed, true, type));
+                let speed = CONFIG.waveMissileSpeedBase + (this.wave * CONFIG.waveMissileSpeedPerWave);
+                if (type === 'boss') speed *= 0.6; // Boss missiles are slower
+
+                const missile = this.missilePool.acquire();
+                missile.init(startX, startY, target.x, target.y, speed, true, type);
+                this.missiles.push(missile);
                 this.waveMissilesLeft--;
                 this.enemiesAlive++;
             }
 
             spawnEnemyMissile(x, y) {
-                 const targets = [...this.cities.filter(c => c.active), this.silo];
-                 if (targets.length === 0) return;
+                const targets = [...this.cities.filter(c => c.active), this.silo];
+                if (targets.length === 0) return;
 
-                 const target = targets[Math.floor(Math.random() * targets.length)];
-                 const speed = 2 + (this.wave * 0.1);
-                 this.missiles.push(new Missile(x, y, target.x, target.y, speed, true));
-                 this.enemiesAlive++;
+                const target = targets[Math.floor(Math.random() * targets.length)];
+                const speed = 2 + (this.wave * 0.1);
+
+                const missile = this.missilePool.acquire();
+                missile.init(x, y, target.x, target.y, speed, true, 'normal');
+                this.missiles.push(missile);
+                this.waveMissilesLeft--;
+                this.enemiesAlive++;
             }
 
             triggerSplit(x, y) {
                 this.spawnParticles(x, y, '#ff00ff');
-                // Spawn 3 small missiles
-                for(let i=0; i<3; i++) {
+                for (let i = 0; i < 3; i++) {
                     this.spawnEnemyMissile(x, y);
                 }
             }
 
             createFlak(x, y) {
                 // Center explosion
-                this.explosions.push(new Explosion(x, y));
+                const explosion = this.explosionPool.acquire();
+                explosion.init(x, y, true, CONFIG.explosionMaxRadius + this.explosionUpgrade);
+                this.explosions.push(explosion);
                 this.spawnParticles(x, y, '#00ffff');
 
-                // Cluster explosions
-                for(let i=0; i<5; i++) {
-                    setTimeout(() => {
+                // Cluster explosions via delayed action queue
+                for (let i = 0; i < 5; i++) {
+                    const delay = i * 50;
+                    this.delayedActions.schedule(delay / (1000 / 60), () => {
                         const offsetX = (Math.random() - 0.5) * 100;
                         const offsetY = (Math.random() - 0.5) * 100;
-                        this.explosions.push(new Explosion(x + offsetX, y + offsetY));
+                        const clusterExp = this.explosionPool.acquire();
+                        clusterExp.init(x + offsetX, y + offsetY, true, CONFIG.explosionMaxRadius * 0.6 + this.explosionUpgrade);
+                        this.explosions.push(clusterExp);
                         this.spawnParticles(x + offsetX, y + offsetY, '#00ffff');
                         this.audio.play('explosion');
-                    }, i * 50);
+                    });
                 }
             }
 
@@ -1268,31 +2056,79 @@
             }
 
             spawnParticles(x, y, color) {
-                for(let i=0; i<CONFIG.particleCount; i++) {
-                    this.particles.push(new Particle(x, y, color));
+                for (let i = 0; i < CONFIG.particleCount; i++) {
+                    const p = this.particlePool.acquire();
+                    p.init(x, y, color);
+                    this.particles.push(p);
                 }
             }
 
+            spawnFloatingText(x, y, text, color, size) {
+                const ft = this.floatingTextPool.acquire();
+                ft.init(x, y, text, color, size);
+                this.floatingTexts.push(ft);
+            }
+
             shake(amount) {
-                this.shakeStrength = amount;
+                this.shakeStrength = Math.min(amount, CONFIG.maxShake);
+            }
+
+            triggerImpactFlash() {
+                const flash = this.ui.impactFlash;
+                flash.style.opacity = '0.4';
+                setTimeout(() => { flash.style.opacity = '0'; }, 80);
+            }
+
+            recordKill(points, x, y) {
+                // Combo tracking
+                const now = performance.now();
+                if (now - this.lastKillTime < CONFIG.comboWindow) {
+                    this.comboCount++;
+                } else {
+                    this.comboCount = 1;
+                }
+                this.lastKillTime = now;
+
+                let finalPoints = points;
+                if (this.comboCount >= 2) {
+                    finalPoints = Math.floor(points * Math.pow(CONFIG.comboMultiplier, this.comboCount - 1));
+                    this.ui.comboDisplay.textContent = `CHAIN x${this.comboCount}`;
+                    this.ui.comboDisplay.classList.add('visible');
+                    this.audio.play('combo');
+                }
+
+                this.score += finalPoints;
+                this.spawnFloatingText(x, y, `+${finalPoints}`, this.comboCount >= 2 ? '#00e5ff' : '#ffffff', this.comboCount >= 2 ? 18 : 14);
             }
 
             checkCollisions() {
+                const explosionRadius = CONFIG.explosionMaxRadius + this.explosionUpgrade;
+
                 // 1. Explosions destroying Enemy Missiles & Bombers
                 this.explosions.forEach(exp => {
                     this.missiles.forEach(m => {
                         if (m.isEnemy && m.active) {
                             const dist = Math.hypot(m.x - exp.x, m.y - exp.y);
                             if (dist < exp.radius) {
-                                m.active = false;
-                                let points = CONFIG.normalKillScore;
-                                if (m.type === 'splitter') points = CONFIG.splitterKillScore;
-                                if (this.currentWeapon === 'flak') points = CONFIG.flakKillScore;
-                                this.score += points;
-                                this.enemiesAlive--;
-                                this.explosions.push(new Explosion(m.x, m.y));
-                                this.spawnParticles(m.x, m.y, '#aaaaaa');
-                                this.audio.play('explosion');
+                                m.health--;
+                                if (m.health <= 0) {
+                                    m.active = false;
+                                    let points = CONFIG.normalKillScore;
+                                    if (m.type === 'splitter') points = CONFIG.splitterKillScore;
+                                    if (m.type === 'boss') points = CONFIG.bossKillScore;
+                                    if (this.currentWeapon === 'flak') points = CONFIG.flakKillScore;
+                                    this.recordKill(points, m.x, m.y);
+                                    this.enemiesAlive--;
+                                    const chainExp = this.explosionPool.acquire();
+                                    chainExp.init(m.x, m.y, false, explosionRadius * 0.5);
+                                    this.explosions.push(chainExp);
+                                    this.spawnParticles(m.x, m.y, '#aaaaaa');
+                                    this.audio.play('explosion');
+                                } else {
+                                    // Boss hit but not destroyed
+                                    this.spawnParticles(m.x, m.y, '#ff4400');
+                                    this.audio.play('hit');
+                                }
                             }
                         }
                     });
@@ -1300,12 +2136,34 @@
                     this.bombers.forEach(b => {
                         if (b.active) {
                             const dist = Math.hypot(b.x - exp.x, b.y - exp.y);
-                             if (dist < exp.radius + 20) {
+                            if (dist < exp.radius + 20) {
                                 b.active = false;
-                                this.score += CONFIG.bomberKillScore;
-                                this.explosions.push(new Explosion(b.x, b.y));
+                                this.recordKill(CONFIG.bomberKillScore, b.x, b.y);
+                                const boomExp = this.explosionPool.acquire();
+                                boomExp.init(b.x, b.y, false, explosionRadius);
+                                this.explosions.push(boomExp);
                                 this.spawnParticles(b.x, b.y, '#cc4444');
                                 this.audio.play('explosion');
+
+                                // Power-up drop chance
+                                if (Math.random() < CONFIG.powerUpChance) {
+                                    const types = ['ammo', 'shield', 'nuke'];
+                                    const puType = types[Math.floor(Math.random() * types.length)];
+                                    const pu = this.powerUpPool.acquire();
+                                    pu.init(b.x, b.y, puType);
+                                    this.powerUps.push(pu);
+                                }
+                            }
+                        }
+                    });
+
+                    // Explosions destroying power-ups
+                    this.powerUps.forEach(pu => {
+                        if (pu.active) {
+                            const dist = Math.hypot(pu.x - exp.x, pu.y - exp.y);
+                            if (dist < exp.radius + 15) {
+                                this.activatePowerUp(pu.type);
+                                pu.active = false;
                             }
                         }
                     });
@@ -1314,19 +2172,30 @@
                 // 2. Enemy Missiles hitting Cities or Silo
                 this.missiles.forEach(m => {
                     if (m.isEnemy && m.active) {
-                        // Simple distance check against targets
                         // Check Cities
-                        this.cities.forEach(c => {
+                        this.cities.forEach((c, idx) => {
                             if (c.active) {
                                 const dist = Math.hypot(m.x - c.x, m.y - c.y);
                                 if (dist < 20) {
                                     m.active = false;
-                                    c.active = false;
                                     this.enemiesAlive--;
-                                    this.explosions.push(new Explosion(m.x, m.y));
-                                    this.shake(CONFIG.cityHitShake);
-                                    this.spawnParticles(m.x, m.y, '#ffffff');
-                                    this.audio.play('hit');
+
+                                    // Check shield
+                                    if (c.shielded) {
+                                        c.shielded = false;
+                                        this.shieldActive = false;
+                                        this.ui.shieldIndicator.classList.remove('visible');
+                                        this.spawnParticles(m.x, m.y, '#00e5ff');
+                                        this.audio.play('hit');
+                                        this.spawnFloatingText(c.x, c.y - 30, 'SHIELD BROKEN', '#00e5ff', 12);
+                                    } else {
+                                        c.active = false;
+                                        this.explosions.push(this.explosionPool.acquire().init(m.x, m.y, false, explosionRadius * 1.5));
+                                        this.shake(CONFIG.cityHitShake);
+                                        this.spawnParticles(m.x, m.y, '#ffffff');
+                                        this.audio.play('bigExplosion');
+                                        this.triggerImpactFlash();
+                                    }
                                 }
                             }
                         });
@@ -1336,25 +2205,103 @@
                         if (distSilo < 30 && this.silo.health > 0) {
                             m.active = false;
                             this.enemiesAlive--;
-                            this.explosions.push(new Explosion(m.x, m.y));
+                            const siloExp = this.explosionPool.acquire();
+                            siloExp.init(m.x, m.y, false, explosionRadius * 0.8);
+                            this.explosions.push(siloExp);
 
                             this.silo.health--;
                             this.shake(CONFIG.siloHitShake);
                             this.spawnParticles(m.x, m.y, '#ffffff');
 
                             if (this.silo.health <= 0) {
-                                this.ammo = 0; // Lost ammo
-                                this.audio.play('explosion'); // Big boom
-                                // Big particles
+                                this.ammo = 0;
+                                this.audio.play('bigExplosion');
                                 this.spawnParticles(this.silo.x, this.silo.y, '#ff0000');
                                 this.spawnParticles(this.silo.x, this.silo.y, '#ffffff');
+                                this.triggerImpactFlash();
                             } else {
                                 this.audio.play('hit');
                             }
                             this.updateUI();
                         }
+
+                        // Close call bonus: missile passes near a city without hitting
+                        if (m.active && m.y > window.innerHeight - 50) {
+                            this.cities.forEach(c => {
+                                if (c.active) {
+                                    const dist = Math.hypot(m.x - c.x, m.y - c.y);
+                                    if (dist < 50 && dist >= 20) {
+                                        this.score += CONFIG.closeCallBonus;
+                                        this.spawnFloatingText(c.x, c.y - 25, `+${CONFIG.closeCallBonus} CLOSE`, '#888888', 10);
+                                    }
+                                }
+                            });
+                        }
                     }
                 });
+
+                // 3. Player missiles hitting power-ups
+                this.missiles.forEach(m => {
+                    if (!m.isEnemy && m.active) {
+                        this.powerUps.forEach(pu => {
+                            if (pu.active) {
+                                const dist = Math.hypot(m.x - pu.x, m.y - pu.y);
+                                if (dist < 20) {
+                                    this.activatePowerUp(pu.type);
+                                    pu.active = false;
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+
+            activatePowerUp(type) {
+                this.audio.play('powerup');
+                switch (type) {
+                    case 'ammo':
+                        this.ammo += 5;
+                        this.spawnFloatingText(window.innerWidth / 2, window.innerHeight / 2, '+5 AMMO', '#00e5ff', 20);
+                        break;
+                    case 'shield':
+                        // Shield the most endangered city (or first active)
+                        const activeCities = this.cities.filter(c => c.active);
+                        if (activeCities.length > 0) {
+                            const city = activeCities[0];
+                            city.shielded = true;
+                            this.shieldActive = true;
+                            this.shieldEndTime = performance.now() + CONFIG.shieldDuration;
+                            this.ui.shieldIndicator.classList.add('visible');
+                            this.spawnFloatingText(city.x, city.y - 35, 'SHIELDED', '#44ff44', 16);
+                        }
+                        break;
+                    case 'nuke':
+                        // Clear all enemies on screen
+                        this.missiles.forEach(m => {
+                            if (m.isEnemy && m.active) {
+                                m.active = false;
+                                this.enemiesAlive--;
+                                const nukeExp = this.explosionPool.acquire();
+                                nukeExp.init(m.x, m.y, false, CONFIG.explosionMaxRadius);
+                                this.explosions.push(nukeExp);
+                                this.spawnParticles(m.x, m.y, '#ff4444');
+                            }
+                        });
+                        this.bombers.forEach(b => {
+                            if (b.active) {
+                                b.active = false;
+                                const boomExp = this.explosionPool.acquire();
+                                boomExp.init(b.x, b.y, false, CONFIG.explosionMaxRadius);
+                                this.explosions.push(boomExp);
+                            }
+                        });
+                        this.audio.play('bigExplosion');
+                        this.triggerImpactFlash();
+                        this.shake(20);
+                        this.spawnFloatingText(window.innerWidth / 2, window.innerHeight / 2, 'NUCLEAR CLEAR', '#ff4444', 24);
+                        break;
+                }
+                this.updateUI();
             }
 
             checkWaveStatus() {
@@ -1363,7 +2310,7 @@
                     return;
                 }
 
-                if (this.waveMissilesLeft === 0 && this.enemiesAlive === 0 && this.bombers.length === 0 && this.explosions.length === 0) {
+                if (this.waveMissilesLeft <= 0 && this.enemiesAlive <= 0 && this.bombers.length === 0 && this.explosions.length === 0) {
                     this.currentState = STATE.WAVE_COMPLETE;
 
                     const cityBonus = this.cities.filter(c => c.active).length * CONFIG.cityBonusPerCity;
@@ -1373,39 +2320,94 @@
                     this.score += totalBonus;
                     this.updateUI();
 
+                    // Calculate credits
+                    const creditsEarned = this.cities.filter(c => c.active).length * CONFIG.creditPerCity +
+                                          this.ammo * CONFIG.creditPerAmmo;
+                    this.credits += creditsEarned;
+
                     this.ui.waveTitle.innerText = `WAVE ${this.wave} COMPLETE`;
-                    this.ui.waveBonus.innerHTML = `CITY BONUS: ${cityBonus}<br>AMMO BONUS: ${ammoBonus}`;
+                    this.ui.waveBonus.innerHTML = `CITY BONUS: ${cityBonus}<br>AMMO BONUS: ${ammoBonus}<br>CREDITS EARNED: ${creditsEarned}`;
+
+                    // Show upgrade section if we have credits
+                    if (this.credits > 0) {
+                        this.ui.upgradeSection.classList.remove('hidden');
+                        this.ui.creditsDisplay.innerText = this.credits;
+                        this.updateUpgradeButtons();
+                    } else {
+                        this.ui.upgradeSection.classList.add('hidden');
+                    }
+
                     this.setScreen(this.ui.waveScreen);
                 }
             }
 
+            updateUpgradeButtons() {
+                const explosionBtn = document.getElementById('upgradeExplosion');
+                const speedBtn = document.getElementById('upgradeSpeed');
+                const ammoBtn = document.getElementById('upgradeAmmo');
+
+                const explosionCost = 50 + this.explosionUpgrade * 20;
+                const speedCost = 40 + this.speedUpgrade * 15;
+                const ammoCost = 30 + this.ammoBonusUpgrade * 10;
+
+                explosionBtn.innerHTML = `EXPLOSION +10<br><small>${explosionCost} CR</small>`;
+                speedBtn.innerHTML = `SPEED +1<br><small>${speedCost} CR</small>`;
+                ammoBtn.innerHTML = `AMMO +5<br><small>${ammoCost} CR</small>`;
+
+                explosionBtn.disabled = this.credits < explosionCost;
+                speedBtn.disabled = this.credits < speedCost;
+                ammoBtn.disabled = this.credits < ammoCost;
+            }
+
+            buyUpgrade(type) {
+                switch (type) {
+                    case 'explosion': {
+                        const cost = 50 + this.explosionUpgrade * 20;
+                        if (this.credits >= cost) {
+                            this.credits -= cost;
+                            this.explosionUpgrade += 10;
+                        }
+                        break;
+                    }
+                    case 'speed': {
+                        const cost = 40 + this.speedUpgrade * 15;
+                        if (this.credits >= cost) {
+                            this.credits -= cost;
+                            this.speedUpgrade += 1;
+                        }
+                        break;
+                    }
+                    case 'ammo': {
+                        const cost = 30 + this.ammoBonusUpgrade * 10;
+                        if (this.credits >= cost) {
+                            this.credits -= cost;
+                            this.ammoBonusUpgrade += 5;
+                        }
+                        break;
+                    }
+                }
+                this.ui.creditsDisplay.innerText = this.credits;
+                this.updateUpgradeButtons();
+                this.audio.play('powerup');
+            }
+
             checkLeaderboard(score) {
                 if (this.leaderboard.length < 5) return true;
-                // If full, check if score is higher than the lowest score
                 return score > this.leaderboard[this.leaderboard.length - 1].score;
             }
 
             submitHighScore() {
                 const name = this.ui.nameInput.value.toUpperCase();
-                if (!name || name.length === 0) return; // Simple validation
+                if (!name || name.length === 0) return;
 
-                // Add to leaderboard
                 this.leaderboard.push({ name: name.substring(0, 3), score: this.score });
-
-                // Sort Descending
                 this.leaderboard.sort((a, b) => b.score - a.score);
-
-                // Keep top 5
                 this.leaderboard = this.leaderboard.slice(0, 5);
-
-                // Save
                 localStorage.setItem('missileDefenseLeaderboard', JSON.stringify(this.leaderboard));
 
-                // Update UI State
                 this.highScore = this.leaderboard.length > 0 ? this.leaderboard[0].score : 0;
                 this.updateUI();
 
-                // Hide Input, Show List and Button
                 this.ui.inputContainer.classList.add('hidden');
                 this.ui.restartBtn.classList.remove('hidden');
                 this.renderLeaderboard();
@@ -1423,6 +2425,7 @@
 
             endGame() {
                 this.currentState = STATE.GAME_OVER;
+                this.loopRunning = false; // FIX: prevent multiple loops
                 this.audio.play('gameover');
 
                 this.ui.finalScore.innerText = `SCORE: ${this.score}`;
@@ -1461,94 +2464,202 @@
                 }, 1500);
             }
 
+            drawTrajectoryPreview() {
+                if (this.currentState !== STATE.PLAYING || this.paused) return;
+                if (!this.isMouseOnCanvas || this.silo.health <= 0) return;
+
+                const ctx = this.ctx;
+                const siloX = this.silo.x;
+                const siloY = this.silo.y;
+
+                ctx.save();
+                ctx.setLineDash([6, 6]);
+                ctx.strokeStyle = this.currentWeapon === 'flak' ? 'rgba(0, 229, 255, 0.3)' : 'rgba(255, 255, 255, 0.2)';
+                ctx.lineWidth = 1;
+                ctx.shadowBlur = 0;
+
+                ctx.beginPath();
+                ctx.moveTo(siloX, siloY);
+                ctx.lineTo(this.mouseX, this.mouseY);
+                ctx.stroke();
+
+                // Draw explosion radius preview
+                const radius = CONFIG.explosionMaxRadius + this.explosionUpgrade;
+                ctx.setLineDash([]);
+                ctx.globalAlpha = 0.15;
+                ctx.strokeStyle = this.currentWeapon === 'flak' ? '#00e5ff' : '#ffffff';
+                ctx.beginPath();
+                ctx.arc(this.mouseX, this.mouseY, radius, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.restore();
+            }
+
             loop() {
-                // Shake Effect
-                let shakeX = 0;
-                let shakeY = 0;
-                if (this.shakeStrength > 0) {
-                    shakeX = (Math.random() - 0.5) * this.shakeStrength;
-                    shakeY = (Math.random() - 0.5) * this.shakeStrength;
-                    this.shakeStrength *= this.shakeDecay;
-                    if(this.shakeStrength < 0.5) this.shakeStrength = 0;
+                if (!this.loopRunning) return;
+
+                const now = performance.now();
+                const rawDt = (now - this.lastFrameTime) / (1000 / 60);
+                const dt = Math.min(rawDt, 3); // Cap delta to prevent spiral of death
+                this.lastFrameTime = now;
+
+                try {
+                    // Shake Effect
+                    let shakeX = 0;
+                    let shakeY = 0;
+                    if (this.shakeStrength > 0) {
+                        shakeX = (Math.random() - 0.5) * this.shakeStrength;
+                        shakeY = (Math.random() - 0.5) * this.shakeStrength;
+                        this.shakeStrength *= this.shakeDecay;
+                        if (this.shakeStrength < 0.5) this.shakeStrength = 0;
+                    }
+
+                    this.ctx.save();
+                    this.ctx.translate(shakeX, shakeY);
+
+                    // Clear Canvas
+                    this.ctx.fillStyle = CONFIG.bg;
+                    this.ctx.fillRect(-shakeX, -shakeY, window.innerWidth, window.innerHeight);
+
+                    // Draw background elements
+                    this.starfield.draw(this.ctx, window.innerWidth, window.innerHeight);
+                    this.terrain.draw(this.ctx, window.innerWidth, window.innerHeight);
+
+                    if (this.currentState === STATE.PLAYING || this.currentState === STATE.WAVE_COMPLETE) {
+                        if (!this.paused) {
+                            // Spawn Logic
+                            this.framesSinceLastSpawn++;
+                            if (this.waveMissilesLeft > 0 && this.framesSinceLastSpawn > this.enemySpawnRate) {
+                                this.spawnEnemy();
+                                this.framesSinceLastSpawn = 0;
+                            }
+
+                            // Random Bomber Spawn (Wave 5+)
+                            if (this.wave >= CONFIG.bomberWaveThreshold && Math.random() < CONFIG.bomberSpawnChance) {
+                                this.spawnBomber();
+                            }
+
+                            // Update shield timer
+                            if (this.shieldActive && performance.now() > this.shieldEndTime) {
+                                this.shieldActive = false;
+                                this.cities.forEach(c => c.shielded = false);
+                                this.ui.shieldIndicator.classList.remove('visible');
+                            }
+
+                            // Update Entities with delta time
+                            this.missiles.forEach(m => {
+                                if (m.update(this, dt)) {
+                                    // Player missile reached target
+                                    if (m.type === 'flak' && !m.isEnemy) {
+                                        this.createFlak(m.x, m.y);
+                                        this.audio.play('explosion');
+                                    } else if (!m.isEnemy) {
+                                        const exp = this.explosionPool.acquire();
+                                        exp.init(m.x, m.y, false, CONFIG.explosionMaxRadius + this.explosionUpgrade);
+                                        this.explosions.push(exp);
+                                        this.audio.play('explosion');
+                                    }
+                                    this.missilePool.release(m);
+                                }
+                            });
+
+                            this.bombers.forEach(b => b.update(this, dt));
+                            this.explosions.forEach(e => e.update(dt));
+                            this.particles.forEach(p => p.update(dt));
+                            this.floatingTexts.forEach(f => f.update(dt));
+                            this.powerUps.forEach(pu => pu.update(dt));
+
+                            // Delayed actions (flak clusters)
+                            this.delayedActions.update(dt);
+
+                            // Collision Detection
+                            this.checkCollisions();
+
+                            // Cleanup - release inactive entities to pools
+                            this.missiles = this.missiles.filter(m => {
+                                if (!m.active) {
+                                    this.missilePool.release(m);
+                                    return false;
+                                }
+                                // Enemy missile went off screen
+                                if (m.isEnemy && m.y > window.innerHeight + 50) {
+                                    this.enemiesAlive--;
+                                    this.missilePool.release(m);
+                                    return false;
+                                }
+                                return true;
+                            });
+                            this.bombers = this.bombers.filter(b => {
+                                if (!b.active) return false;
+                                return true;
+                            });
+                            this.explosions = this.explosions.filter(e => {
+                                if (!e.active) {
+                                    this.explosionPool.release(e);
+                                    return false;
+                                }
+                                return true;
+                            });
+                            this.particles = this.particles.filter(p => {
+                                if (!p.active) {
+                                    this.particlePool.release(p);
+                                    return false;
+                                }
+                                return true;
+                            });
+                            this.floatingTexts = this.floatingTexts.filter(f => {
+                                if (!f.active) {
+                                    this.floatingTextPool.release(f);
+                                    return false;
+                                }
+                                return true;
+                            });
+                            this.powerUps = this.powerUps.filter(pu => {
+                                if (!pu.active) {
+                                    this.powerUpPool.release(pu);
+                                    return false;
+                                }
+                                return true;
+                            });
+
+                            // Combo timer decay
+                            if (performance.now() - this.lastKillTime > CONFIG.comboWindow) {
+                                this.comboCount = 0;
+                                this.ui.comboDisplay.classList.remove('visible');
+                            }
+
+                            // Logic Check
+                            this.checkWaveStatus();
+                        }
+
+                        // Draw Entities
+                        this.cities.forEach(c => c.draw(this.ctx));
+                        this.silo.draw(this.ctx, this.ammo);
+                        this.missiles.forEach(m => m.draw(this.ctx));
+                        this.bombers.forEach(b => b.draw(this.ctx));
+                        this.explosions.forEach(e => e.draw(this.ctx));
+                        this.particles.forEach(p => p.draw(this.ctx));
+                        this.floatingTexts.forEach(f => f.draw(this.ctx));
+                        this.powerUps.forEach(pu => pu.draw(this.ctx));
+
+                        // Trajectory preview
+                        this.drawTrajectoryPreview();
+                    }
+
+                    this.ctx.restore();
+                } catch (e) {
+                    console.error('Game loop error:', e);
+                    // Keep rendering even on error
                 }
 
-                this.ctx.save();
-                this.ctx.translate(shakeX, shakeY);
-
-                // Clear Canvas
-                this.ctx.fillStyle = CONFIG.bg;
-                this.ctx.fillRect(-shakeX, -shakeY, this.canvas.width, this.canvas.height);
-
-                if (this.currentState === STATE.PLAYING) {
-                   if (!this.paused) {
-                       // Spawn Logic
-                       this.framesSinceLastSpawn++;
-                       if (this.waveMissilesLeft > 0 && this.framesSinceLastSpawn > this.enemySpawnRate) {
-                           this.spawnEnemy();
-                           this.framesSinceLastSpawn = 0;
-                       }
-
-               // Random Bomber Spawn (Wave 5+)
-                        if (this.wave >= CONFIG.bomberWaveThreshold && Math.random() < CONFIG.bomberSpawnChance) {
-                           this.spawnBomber();
-                       }
-
-                       // Update Entities
-                       this.missiles.forEach(m => {
-                           if(m.update(this)) {
-                               // Player missile reached target
-                               if (m.type === 'flak' && !m.isEnemy) {
-                                   this.createFlak(m.x, m.y);
-                                   this.audio.play('explosion'); // First bang
-                               } else {
-                                   this.explosions.push(new Explosion(m.x, m.y));
-                                   this.audio.play('explosion');
-                               }
-                           } else if (m.isEnemy && m.active && m.y > this.canvas.height) {
-                               // Enemy missile went off screen (missed everything)
-                               m.active = false;
-                               this.enemiesAlive--;
-                           }
-                       });
-                       this.bombers.forEach(b => b.update(this));
-                       this.explosions.forEach(e => e.update());
-                       this.particles.forEach(p => p.update());
-
-                       // Collision Detection
-                       this.checkCollisions();
-                       this.updateUI(); // To show score updates live
-
-                       // Cleanup
-                       this.missiles = this.missiles.filter(m => m.active);
-                       this.bombers = this.bombers.filter(b => b.active);
-                       this.explosions = this.explosions.filter(e => e.active);
-                       this.particles = this.particles.filter(p => p.active);
-
-                       // Logic Check
-                       this.checkWaveStatus();
-                   }
-
-                   // Draw Entities
-                   this.cities.forEach(c => c.draw(this.ctx));
-                   this.silo.draw(this.ctx, this.ammo);
-                   this.missiles.forEach(m => m.draw(this.ctx));
-                   this.bombers.forEach(b => b.draw(this.ctx));
-                   this.explosions.forEach(e => e.draw(this.ctx));
-                   this.particles.forEach(p => p.draw(this.ctx));
-
-// Pause is handled by the overlay, not canvas text
-                }
-
-                this.ctx.restore();
                 requestAnimationFrame(() => this.loop());
             }
         }
 
         // Initialize Game
         window.addEventListener('load', () => {
-            window.game = new Game(); // Exposed for debugging
+            window.game = new Game();
         });
-
     </script>
 </body>
 </html>
