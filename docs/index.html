@@ -2219,6 +2219,8 @@
                                 this.spawnParticles(this.silo.x, this.silo.y, '#ff0000');
                                 this.spawnParticles(this.silo.x, this.silo.y, '#ffffff');
                                 this.triggerImpactFlash();
+                                this.spawnFloatingText(this.silo.x, this.silo.y - 40, 'SILO DESTROYED', '#ff4444', 18);
+                                this.endGame();
                             } else {
                                 this.audio.play('hit');
                             }
