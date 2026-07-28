@@ -2310,7 +2310,7 @@
                     return;
                 }
 
-                if (this.waveMissilesLeft <= 0 && this.enemiesAlive <= 0 && this.bombers.length === 0 && this.explosions.length === 0) {
+                if (this.waveMissilesLeft <= 0 && this.enemiesAlive <= 0 && this.bombers.length === 0) {
                     this.currentState = STATE.WAVE_COMPLETE;
 
                     const cityBonus = this.cities.filter(c => c.active).length * CONFIG.cityBonusPerCity;
