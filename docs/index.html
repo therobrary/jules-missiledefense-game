@@ -2440,7 +2440,8 @@
 
             endGame() {
                 this.currentState = STATE.GAME_OVER;
-                this.loopRunning = false; // FIX: prevent multiple loops
+                // Keep the loop running so background, explosions, and particles animate
+                // behind the game over screen. loopRunning stays true.
                 this.audio.play('gameover');
 
                 this.ui.finalScore.innerText = `SCORE: ${this.score}`;
@@ -2540,8 +2541,9 @@
                     this.starfield.draw(this.ctx, window.innerWidth, window.innerHeight);
                     this.terrain.draw(this.ctx, window.innerWidth, window.innerHeight);
 
-                    if (this.currentState === STATE.PLAYING || this.currentState === STATE.WAVE_COMPLETE) {
-                        if (!this.paused) {
+                    // Include GAME_OVER so entities keep rendering behind the game over screen
+                    if (this.currentState === STATE.PLAYING || this.currentState === STATE.WAVE_COMPLETE || this.currentState === STATE.GAME_OVER) {
+                        if (!this.paused && this.currentState !== STATE.GAME_OVER) {
                             // Spawn Logic
                             this.framesSinceLastSpawn++;
                             if (this.waveMissilesLeft > 0 && this.framesSinceLastSpawn > this.enemySpawnRate) {
