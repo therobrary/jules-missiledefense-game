@@ -2316,8 +2316,24 @@
                 // Only check once per wave completion - don't re-trigger in WAVE_COMPLETE state
                 if (this.currentState !== STATE.PLAYING) return;
 
+                // Debug: log wave status every 60 frames
+                if (this.framesSinceLastSpawn % 60 === 0) {
+                    console.log('[WAVE CHECK]', {
+                        waveMissilesLeft: this.waveMissilesLeft,
+                        enemiesAlive: this.enemiesAlive,
+                        bombers: this.bombers.length,
+                        state: this.currentState,
+                        missiles: this.missiles.filter(m => m.isEnemy && m.active).length
+                    });
+                }
+
                 // Only check wave completion while actively playing - prevents re-triggering in WAVE_COMPLETE
                 if (this.currentState === STATE.PLAYING && this.waveMissilesLeft <= 0 && this.enemiesAlive <= 0 && this.bombers.length === 0) {
+                    console.log('[WAVE COMPLETE TRIGGERED]', {
+                        waveMissilesLeft: this.waveMissilesLeft,
+                        enemiesAlive: this.enemiesAlive,
+                        bombers: this.bombers.length
+                    });
                     this.currentState = STATE.WAVE_COMPLETE;
 
                     const cityBonus = this.cities.filter(c => c.active).length * CONFIG.cityBonusPerCity;
