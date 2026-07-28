@@ -2017,7 +2017,7 @@
                 const missile = this.missilePool.acquire();
                 missile.init(x, y, target.x, target.y, speed, true, 'normal');
                 this.missiles.push(missile);
-                this.waveMissilesLeft--;
+                // Don't decrement waveMissilesLeft - these are splitter/bomber children
                 this.enemiesAlive++;
             }
 
@@ -2220,7 +2220,8 @@
                                 this.spawnParticles(this.silo.x, this.silo.y, '#ffffff');
                                 this.triggerImpactFlash();
                                 this.spawnFloatingText(this.silo.x, this.silo.y - 40, 'SILO DESTROYED', '#ff4444', 18);
-                                this.endGame();
+                                // Silo destroyed - player can no longer fire, but game continues
+                                // Cities can still be hit; game over only when all cities fall
                             } else {
                                 this.audio.play('hit');
                             }
@@ -2312,7 +2313,11 @@
                     return;
                 }
 
-                if (this.waveMissilesLeft <= 0 && this.enemiesAlive <= 0 && this.bombers.length === 0) {
+                // Only check once per wave completion - don't re-trigger in WAVE_COMPLETE state
+                if (this.currentState !== STATE.PLAYING) return;
+
+                // Only check wave completion while actively playing - prevents re-triggering in WAVE_COMPLETE
+                if (this.currentState === STATE.PLAYING && this.waveMissilesLeft <= 0 && this.enemiesAlive <= 0 && this.bombers.length === 0) {
                     this.currentState = STATE.WAVE_COMPLETE;
 
                     const cityBonus = this.cities.filter(c => c.active).length * CONFIG.cityBonusPerCity;
@@ -2583,9 +2588,10 @@
                                     this.missilePool.release(m);
                                     return false;
                                 }
-                                // Enemy missile went off screen
+                                // Enemy missile went off screen without being destroyed
                                 if (m.isEnemy && m.y > window.innerHeight + 50) {
-                                    this.enemiesAlive--;
+                                    // Only decrement if still alive (wasn't already killed by explosion)
+                                    if (this.enemiesAlive > 0) this.enemiesAlive--;
                                     this.missilePool.release(m);
                                     return false;
                                 }
