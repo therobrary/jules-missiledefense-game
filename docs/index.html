@@ -2316,24 +2316,16 @@
                 // Only check once per wave completion - don't re-trigger in WAVE_COMPLETE state
                 if (this.currentState !== STATE.PLAYING) return;
 
-                // Debug: log wave status every 60 frames
-                if (this.framesSinceLastSpawn % 60 === 0) {
-                    console.log('[WAVE CHECK]', {
-                        waveMissilesLeft: this.waveMissilesLeft,
-                        enemiesAlive: this.enemiesAlive,
-                        bombers: this.bombers.length,
-                        state: this.currentState,
-                        missiles: this.missiles.filter(m => m.isEnemy && m.active).length
-                    });
-                }
+                // Safety net: recount actual enemies on screen.
+                // Cleanup filter may leave stale missiles with active=true but off-screen,
+                // keeping enemiesAlive > 0 forever and blocking wave completion.
+                const onScreenEnemies = this.missiles.filter(m => m.isEnemy && m.active && m.y <= window.innerHeight + 50).length;
+                if (onScreenEnemies !== this.enemiesAlive) this.enemiesAlive = onScreenEnemies;
+                const liveBombers = this.bombers.filter(b => b.active).length;
+                if (liveBombers !== this.bombers.length) this.bombers = this.bombers.filter(b => b.active);
 
                 // Only check wave completion while actively playing - prevents re-triggering in WAVE_COMPLETE
                 if (this.currentState === STATE.PLAYING && this.waveMissilesLeft <= 0 && this.enemiesAlive <= 0 && this.bombers.length === 0) {
-                    console.log('[WAVE COMPLETE TRIGGERED]', {
-                        waveMissilesLeft: this.waveMissilesLeft,
-                        enemiesAlive: this.enemiesAlive,
-                        bombers: this.bombers.length
-                    });
                     this.currentState = STATE.WAVE_COMPLETE;
 
                     const cityBonus = this.cities.filter(c => c.active).length * CONFIG.cityBonusPerCity;
