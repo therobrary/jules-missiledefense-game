@@ -2319,10 +2319,10 @@
                 // Safety net: recount actual enemies on screen.
                 // Cleanup filter may leave stale missiles with active=true but off-screen,
                 // keeping enemiesAlive > 0 forever and blocking wave completion.
-                const onScreenEnemies = this.missiles.filter(m => m.isEnemy && m.active && m.y <= window.innerHeight + 50).length;
+                const onScreenEnemies = this.missiles.filter(m => m && m.isEnemy && m.active && m.y <= window.innerHeight + 50).length;
                 if (onScreenEnemies !== this.enemiesAlive) this.enemiesAlive = onScreenEnemies;
-                const liveBombers = this.bombers.filter(b => b.active).length;
-                if (liveBombers !== this.bombers.length) this.bombers = this.bombers.filter(b => b.active);
+                const liveBombers = this.bombers.filter(b => b && b.active).length;
+                if (liveBombers !== this.bombers.length) this.bombers = this.bombers.filter(b => b && b.active);
 
                 // Only check wave completion while actively playing - prevents re-triggering in WAVE_COMPLETE
                 if (this.currentState === STATE.PLAYING && this.waveMissilesLeft <= 0 && this.enemiesAlive <= 0 && this.bombers.length === 0) {
@@ -2580,11 +2580,11 @@
                                 }
                             });
 
-                            this.bombers.forEach(b => b.update(this, dt));
-                            this.explosions.forEach(e => e.update(dt));
-                            this.particles.forEach(p => p.update(dt));
-                            this.floatingTexts.forEach(f => f.update(dt));
-                            this.powerUps.forEach(pu => pu.update(dt));
+                            this.bombers.forEach(b => { if (b && b.active) b.update(this, dt); });
+                            this.explosions.forEach(e => { if (e && e.active) e.update(dt); });
+                            this.particles.forEach(p => { if (p && p.active) p.update(dt); });
+                            this.floatingTexts.forEach(f => { if (f && f.active) f.update(dt); });
+                            this.powerUps.forEach(pu => { if (pu && pu.active) pu.update(dt); });
 
                             // Delayed actions (flak clusters)
                             this.delayedActions.update(dt);
@@ -2594,8 +2594,8 @@
 
                             // Cleanup - release inactive entities to pools
                             this.missiles = this.missiles.filter(m => {
-                                if (!m.active) {
-                                    this.missilePool.release(m);
+                                if (!m || !m.active) {
+                                    if (m) this.missilePool.release(m);
                                     return false;
                                 }
                                 // Enemy missile went off screen without being destroyed
@@ -2608,7 +2608,7 @@
                                 return true;
                             });
                             this.bombers = this.bombers.filter(b => {
-                                if (!b.active) return false;
+                                if (!b || !b.active) return false;
                                 return true;
                             });
                             this.explosions = this.explosions.filter(e => {
