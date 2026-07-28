@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Robrary Games: Missile Defense</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><text y=%2214%22 font-size=%2214%22>🚀</text></svg>">
     <style>
         /* ============================================================
            NEON NOIR DESIGN TOKENS
@@ -2612,29 +2613,29 @@
                                 return true;
                             });
                             this.explosions = this.explosions.filter(e => {
-                                if (!e.active) {
-                                    this.explosionPool.release(e);
+                                if (!e || !e.active) {
+                                    if (e) this.explosionPool.release(e);
                                     return false;
                                 }
                                 return true;
                             });
                             this.particles = this.particles.filter(p => {
-                                if (!p.active) {
-                                    this.particlePool.release(p);
+                                if (!p || !p.active) {
+                                    if (p) this.particlePool.release(p);
                                     return false;
                                 }
                                 return true;
                             });
                             this.floatingTexts = this.floatingTexts.filter(f => {
-                                if (!f.active) {
-                                    this.floatingTextPool.release(f);
+                                if (!f || !f.active) {
+                                    if (f) this.floatingTextPool.release(f);
                                     return false;
                                 }
                                 return true;
                             });
                             this.powerUps = this.powerUps.filter(pu => {
-                                if (!pu.active) {
-                                    this.powerUpPool.release(pu);
+                                if (!pu || !pu.active) {
+                                    if (pu) this.powerUpPool.release(pu);
                                     return false;
                                 }
                                 return true;
