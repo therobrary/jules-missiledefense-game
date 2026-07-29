@@ -26,3 +26,18 @@ A Neon Noir, grayscale-first arcade game inspired by the classic Missile Command
 *   **Vanilla JavaScript (ES6+)**: No external libraries or frameworks.
 *   **CSS3**: For UI overlays and typography.
 *   **LocalStorage**: Persists high scores locally.
+
+
+## Security
+
+The leaderboard renders player-submitted names via `textContent` only — never via `innerHTML`. Names are also stripped of control chars and HTML meta-chars before being persisted to `localStorage`, and capped at 3 characters.
+
+Do not reintroduce `innerHTML` for "convenience". Use `createElement` + `textContent`, or pass any interpolated values through `escapeHTML()` first.
+
+The XSS regression test lives at `/tmp/xss-smoke/md-smoke.js`. Run it after any change to `renderLeaderboard()`:
+
+```bash
+cd /tmp/xss-smoke && node md-smoke.js /Users/robert/Documents/codeprojects/jules-missiledefense-game/docs/index.html
+```
+
+A passing run prints `OK: leaderboard renders poisoned names as text; no <img>/<script> tags injected` and exits 0. A failing run shows the injected `<img>`/`<script>` tags and exits 1.

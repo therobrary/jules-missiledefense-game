@@ -667,6 +667,18 @@
 
     <script>
         /* ============================================================
+           UTILITIES
+           ============================================================ */
+        function escapeHTML(s) {
+            return String(s)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        /* ============================================================
            GAME CONSTANTS & CONFIG
            ============================================================ */
         const CONFIG = {
@@ -2413,10 +2425,16 @@
             }
 
             submitHighScore() {
-                const name = this.ui.nameInput.value.toUpperCase();
+                const rawName = this.ui.nameInput.value;
+                const name = String(rawName)
+                    .toUpperCase()
+                    // SECURITY: strip control chars and HTML meta-chars
+                    // before persisting to localStorage (defence-in-depth)
+                    .replace(/[\x00-\x1f<>&"']/g, '')
+                    .substring(0, 3);
                 if (!name || name.length === 0) return;
 
-                this.leaderboard.push({ name: name.substring(0, 3), score: this.score });
+                this.leaderboard.push({ name: name, score: this.score });
                 this.leaderboard.sort((a, b) => b.score - a.score);
                 this.leaderboard = this.leaderboard.slice(0, 5);
                 localStorage.setItem('missileDefenseLeaderboard', JSON.stringify(this.leaderboard));
@@ -2434,7 +2452,14 @@
                 this.leaderboard.forEach((entry, index) => {
                     const li = document.createElement('li');
                     li.className = 'highscore-item';
-                    li.innerHTML = `<span>${index + 1}. ${entry.name}</span><span>${entry.score}</span>`;
+                    // SECURITY: render via textContent to prevent stored XSS
+                    // (entry.name is user-supplied via localStorage round-trip)
+                    const rankSpan = document.createElement('span');
+                    rankSpan.textContent = `${index + 1}. ${entry.name}`;
+                    const scoreSpan = document.createElement('span');
+                    scoreSpan.textContent = entry.score;
+                    li.appendChild(rankSpan);
+                    li.appendChild(scoreSpan);
                     this.ui.highScoreList.appendChild(li);
                 });
             }
